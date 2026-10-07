@@ -7,13 +7,13 @@ class dma_coverage extends uvm_component;
 
   covergroup desc_cg;
     cp_dir: coverpoint dir_s;
-    cp_len: coverpoint len_s { bins len_tiny={[1:4]}; bins len_small={[5:32]}; bins len_medium={[33:256]}; bins len_large={[257:4096]}; bins len_huge={[4097:65535]}; }
+    cp_len: coverpoint len_s { bins len_zero={0}; bins len_tiny={[1:4]}; bins len_small={[5:32]}; bins len_medium={[33:256]}; bins len_large={[257:4096]}; bins len_huge={[4097:65535]}; }
     cp_align: coverpoint align_s { bins a0={0}; bins a1={1}; bins a2={2}; bins a3={3}; }
     x_dir_len: cross cp_dir,cp_len;
   endgroup
   covergroup tlp_cg;
     cp_kind: coverpoint kind_s { bins rd={PCIE_MEM_RD}; bins wr={PCIE_MEM_WR}; bins cpl={PCIE_CPLD}; }
-    cp_len: coverpoint tlp_len_s { bins le32={[1:32]}; bins b33_128={[33:128]}; bins b129_256={[129:256]}; bins b257_512={[257:512]}; }
+    cp_len: coverpoint tlp_len_s { bins zero={0}; bins le32={[1:32]}; bins b33_128={[33:128]}; bins b129_256={[129:256]}; bins b257_512={[257:512]}; }
     cp_4k: coverpoint cross4k_s { bins legal={0}; illegal_bins crossed={1}; }
     cp_cpl_status: coverpoint cpl_status_s iff(kind_s==PCIE_CPLD) {
       bins successful={3'b000};
