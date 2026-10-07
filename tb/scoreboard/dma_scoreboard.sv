@@ -20,6 +20,7 @@ class dma_pcie_read_ctx extends uvm_object;
   longint unsigned next_addr;
   int unsigned remaining;
   int unsigned cpl_count;
+  bit zero_len;
   function new(string name="dma_pcie_read_ctx"); super.new(name); endfunction
 endclass
 
@@ -162,7 +163,12 @@ class dma_scoreboard extends uvm_component;
     foreach(pending[k]) begin
       e=pending[k];
       if(e.dir!=DMA_C2H) continue;
-      if(o.addr < e.pcie_addr+e.len && o.addr+o.byte_len > e.pcie_addr) begin
+      // A PCIe zero-length Memory Write is encoded as one DW with First BE=0.
+      // The semantic commit contains zero bytes, so interval-overlap math has
+      // an empty range.  Match it to the live zero-length descriptor by the
+      // naturally DW-aligned request address instead.
+      if((e.len==0 && o.byte_len==0 && ((e.pcie_addr & ~64'h3)==o.addr)) ||
+         (e.len!=0 && o.addr < e.pcie_addr+e.len && o.addr+o.byte_len > e.pcie_addr)) begin
         overlap_count++;
         for(int i=0;i<o.byte_len;i++) begin
           a=o.addr+i;
@@ -196,7 +202,11 @@ class dma_scoreboard extends uvm_component;
       return;
     end
     c=dma_pcie_read_ctx::type_id::create("rd_ctx");
-    c.tag=o.tag; c.requester_id=o.requester_id; c.start_addr=o.addr; c.next_addr=o.addr; c.remaining=o.byte_len;
+    c.tag=o.tag; c.requester_id=o.requester_id; c.start_addr=o.addr; c.next_addr=o.addr;
+    c.zero_len=(o.byte_len==0);
+    // A zero-length MemRd still consumes one successful Completion with
+    // Byte Count=1 / Length=1DW; the DUT suppresses the RAM write internally.
+    c.remaining=c.zero_len ? 1 : o.byte_len;
     pcie_reads[o.tag]=c;
     if(pcie_reads.num()>max_pcie_outstanding) max_pcie_outstanding=pcie_reads.num();
   endfunction
