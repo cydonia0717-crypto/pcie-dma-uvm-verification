@@ -7,7 +7,7 @@ class dma_coverage extends uvm_component;
 
   covergroup desc_cg;
     cp_dir: coverpoint dir_s;
-    cp_len: coverpoint len_s { bins tiny={[1:4]}; bins small={[5:32]}; bins medium={[33:256]}; bins large={[257:4096]}; bins huge={[4097:65535]}; }
+    cp_len: coverpoint len_s { bins len_tiny={[1:4]}; bins len_small={[5:32]}; bins len_medium={[33:256]}; bins len_large={[257:4096]}; bins len_huge={[4097:65535]}; }
     cp_align: coverpoint align_s { bins a0={0}; bins a1={1}; bins a2={2}; bins a3={3}; }
     x_dir_len: cross cp_dir,cp_len;
   endgroup
