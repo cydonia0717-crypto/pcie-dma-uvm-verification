@@ -3,6 +3,7 @@ class dma_coverage extends uvm_component;
   uvm_analysis_imp_cov_desc #(dma_desc_obs,dma_coverage) desc_imp;
   uvm_analysis_imp_cov_tlp #(pcie_tlp_item,dma_coverage) tlp_imp;
   uvm_analysis_imp_cov_ram #(dma_ram_obs,dma_coverage) ram_imp;
+  virtual dma_cfg_if cfg_vif;
 
   dma_dir_e dir_s;
   int unsigned len_s,align_s;
@@ -109,6 +110,34 @@ class dma_coverage extends uvm_component;
     pcie_state_cg=new;
     tag_lifecycle_cg=new;
   endfunction
+
+  function void build_phase(uvm_phase phase);
+    if(!uvm_config_db#(virtual dma_cfg_if)::get(this,"","cfg_vif",cfg_vif))
+      `uvm_fatal("COV","no cfg vif")
+  endfunction
+
+  function void flush_on_reset();
+    desc_live.delete();
+    rd_remaining.delete();
+    rd_cpl_count.delete();
+    rd_issue_order.delete();
+    tag_seen.delete();
+    next_issue_order=0;
+    desc_out_s=0;
+    pcie_out_s=0;
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    bit saw_reset_deasserted=0;
+    bit prev_rst=1;
+    forever begin
+      @(posedge cfg_vif.clk);
+      if(!cfg_vif.rst) saw_reset_deasserted=1;
+      if(cfg_vif.rst && !prev_rst && saw_reset_deasserted)
+        flush_on_reset();
+      prev_rst=cfg_vif.rst;
+    end
+  endtask
 
   function longint unsigned desc_key(dma_dir_e dir,bit[7:0] tag);
     return (longint'(dir)<<8)|tag;
