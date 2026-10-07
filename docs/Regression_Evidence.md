@@ -5,26 +5,28 @@ This file records the last fully qualified public baseline used by the resume nu
 ## Baseline
 
 - GitHub Actions workflow: `oss-smoke`
-- run: **#89**
-- head: `8c5110e5b186acfad7a8be1da0a690f47a70ca1a`
+- run: **#110**
+- head: `3a33ec3fbd2050a09fecebb7c22392101c91eb66`
 - conclusion: **success**
-- artifact: `pcie-dma-regression-89`
+- artifact: `pcie-dma-regression-110`
 
 The qualification archived each UVM run log, each Verilator coverage database, the merged coverage database, machine-readable regression summary, and the pristine-upstream bug reproducer.
 
 ## Normal-regression totals
 
-- clean simulation runs: **14**
-- completed descriptor end-to-end checks: **258**
-- Memory Read TLPs: **2,705**
-- Memory Write TLPs: **1,110**
-- Completion-with-Data packets: **41,391**
-- read requests completed through multiple CplD packets: **2,674**
+- clean simulation runs: **15**
+- completed descriptor end-to-end checks: **260**
+- Memory Read TLPs: **2,708**
+- Memory Write TLPs: **1,112**
+- Completion-with-Data packets: **41,399**
+- read requests completed through multiple CplD packets: **2,675**
 - peak simultaneous PCIe Memory Read tags: **16**
 - peak simultaneous DMA descriptors: **11**
+- distinct PCIe tags exercised: **16**
+- legal PCIe tag reuse events after retirement: **2,568**
 - largest observed MemRd: **512 B**
 - largest observed MemWr: **256 B**
-- H2C Device-RAM bytes written: **1,322,015 B**
+- H2C Device-RAM bytes written: **1,322,271 B**
 - UVM errors/fatals: **0 / 0 in every normal run**
 
 ## Directed proof points
@@ -45,7 +47,13 @@ The directed tag-pressure run holds Completion traffic until the requester has c
 [16TAG] scoreboard observed 16 simultaneous PCIe Memory Read tags
 ```
 
-Its scoreboard summary reports `max_pcie_outstanding=16`.
+Its scoreboard summary reports `max_pcie_outstanding=16`.  The same directed test also reports:
+
+```text
+[TAGREUSE] observed 48 legal PCIe tag reuse events after retirement
+```
+
+The scoreboard rejects reuse while a tag is still active, while the lifecycle coverage separately requires both first-use and legal-reuse bins.
 
 ### MRRS / MPS
 
@@ -79,6 +87,16 @@ The maximum 16-bit descriptor boundary is verified in both directions:
 
 This same test originally exposed the read-size arithmetic overflow documented in `Discovered_Bug_MaxLen_Read.md`.
 
+### Mid-flight reset recovery
+
+The reset-directed run first allows a real H2C descriptor to create live PCIe read state while Completion traffic is held.  Runtime reset then flushes verification-side stale contexts and the DUT is required to clear busy/resource state before accepting fresh traffic.  Run #110 reports:
+
+```text
+[RESET] mid-flight reset flushed 1 descriptors/2 PCIe reads, dropped 16 stale CplD, and post-reset H2C/C2H completed cleanly
+```
+
+This checks both cancellation of pre-reset work and forward progress after reset; old queued Completion packets are explicitly discarded instead of leaking into the new reset epoch.
+
 ### 1 MiB logical DMA
 
 The large-transfer run completes exactly **1 MiB H2C** via **17 descriptors** and reports 16 PCIe tags in flight.  It is intentionally described as a chained logical transfer, not a 1 MiB single descriptor.
@@ -95,8 +113,8 @@ Both H2C and C2H zero-length descriptors are checked.  The qualification require
 
 Merged public qualification:
 
-- reachable functional coverage: **48/48 = 100%**
-- raw covergroup: **48/50 = 96.0%**
+- reachable functional coverage: **51/51 = 100%**
+- raw covergroup: **51/53 = 96.2%**
 - DUT-scoped line coverage: **818/840 = 97.4%**
 - DUT-scoped branch coverage: **208/253 = 82.2%**
 
