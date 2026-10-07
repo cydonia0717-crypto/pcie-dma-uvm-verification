@@ -22,6 +22,7 @@ class pcie_host_responder extends uvm_component;
   int unsigned tx_rd_stall_cycles;
   int unsigned tx_wr_stall_cycles;
   int unsigned cpl_stall_cycles;
+  int unsigned reset_dropped_completions;
   pcie_tlp_item active_cpl_obs;
   bit wr_active;
   longint unsigned wr_addr;
@@ -187,11 +188,20 @@ class pcie_host_responder extends uvm_component;
       @(vif.host_cb); cycle++;
       if(vif.host_cb.rst) begin
         vif.host_cb.rx_cpl_valid<=0;
+        if(pending.size()!=0) begin
+          reset_dropped_completions += pending.size();
+          pending.delete();
+        end
         cpl_release_armed=(cfg.hold_cpl_until_unique_tags==0);
         forced_ooo_done=0;
         injected_ur=0;
         max_unique_pending_tags=0;
         active_cpl_obs=null;
+        wr_active=0;
+        wr_addr='0;
+        wr_dw_len=0;
+        wr_dw_seen=0;
+        wr_byte_len=0;
         continue;
       end
       if(vif.rx_cpl_valid && !vif.host_cb.rx_cpl_ready) begin
