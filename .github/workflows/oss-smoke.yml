@@ -2,7 +2,15 @@ name: oss-smoke
 on:
   workflow_dispatch:
   push:
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - '**/*.md'
   pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - '**/*.md'
 
 concurrency:
   group: pcie-dma-${{ github.ref }}
