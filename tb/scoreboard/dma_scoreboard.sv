@@ -40,6 +40,8 @@ class dma_scoreboard extends uvm_component;
   int unsigned checks,errors,memrd_count,memwr_count,max_h2c_outstanding;
   int unsigned max_memrd_tlp_bytes,max_memwr_tlp_bytes;
   int unsigned max_pcie_outstanding,cpld_count,split_read_requests;
+  bit pcie_tag_seen[bit[9:0]];
+  int unsigned unique_pcie_tags_seen,pcie_tag_reuse_count;
   int unsigned ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count;
   longint unsigned first_ram_wr_addr,last_ram_wr_addr;
   int unsigned h2c_outstanding,c2h_outstanding,max_desc_outstanding,max_c2h_outstanding;
@@ -201,6 +203,12 @@ class dma_scoreboard extends uvm_component;
         o.tag,pcie_reads[o.tag].remaining))
       return;
     end
+    if(pcie_tag_seen.exists(o.tag)) begin
+      pcie_tag_reuse_count++;
+    end else begin
+      pcie_tag_seen[o.tag]=1;
+      unique_pcie_tags_seen++;
+    end
     c=dma_pcie_read_ctx::type_id::create("rd_ctx");
     c.tag=o.tag; c.requester_id=o.requester_id; c.start_addr=o.addr; c.next_addr=o.addr;
     c.zero_len=(o.byte_len==0);
@@ -310,9 +318,9 @@ class dma_scoreboard extends uvm_component;
   endfunction
 
   function void report_phase(uvm_phase phase);
-    `uvm_info("SB",$sformatf("checks=%0d errors=%0d memrd=%0d memwr=%0d cpld=%0d max_pcie_outstanding=%0d split_reads=%0d max_desc_outstanding=%0d max_h2c_desc=%0d max_c2h_desc=%0d max_memrd_tlp=%0d max_memwr_tlp=%0d ram_rd_cmds=%0d ram_wr_cmds=%0d ram_wr_bytes=%0d",
+    `uvm_info("SB",$sformatf("checks=%0d errors=%0d memrd=%0d memwr=%0d cpld=%0d max_pcie_outstanding=%0d split_reads=%0d max_desc_outstanding=%0d max_h2c_desc=%0d max_c2h_desc=%0d max_memrd_tlp=%0d max_memwr_tlp=%0d ram_rd_cmds=%0d ram_wr_cmds=%0d ram_wr_bytes=%0d unique_pcie_tags=%0d pcie_tag_reuse=%0d",
       checks,errors,memrd_count,memwr_count,cpld_count,max_pcie_outstanding,split_read_requests,max_desc_outstanding,
       max_h2c_outstanding,max_c2h_outstanding,max_memrd_tlp_bytes,max_memwr_tlp_bytes,
-      ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count),UVM_LOW)
+      ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count,unique_pcie_tags_seen,pcie_tag_reuse_count),UVM_LOW)
   endfunction
 endclass
