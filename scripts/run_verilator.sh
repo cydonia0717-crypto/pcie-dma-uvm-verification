@@ -9,6 +9,7 @@ SEED=${SEED:-1}
 BUILD_OUT=${BUILD_OUT:-"$ROOT/out/verilator/build"}
 OUT=${OUT:-"$ROOT/out/verilator/runs/$TEST.$SEED"}
 FORCE_REBUILD=${FORCE_REBUILD:-0}
+VERILATOR_IMAGE=${VERILATOR_IMAGE:-"verilator/verilator@sha256:a5b73e2fce0b2c483396f3800940f33b6faa802331a061c21694dd27b7352120"}
 
 command -v docker >/dev/null || { echo "docker required for reproducible OSS run" >&2; exit 2; }
 [ -f "$DUT/rtl/dma_if_pcie.v" ] || { echo "run scripts/bootstrap_oss.sh first" >&2; exit 2; }
@@ -20,7 +21,7 @@ if [ "$FORCE_REBUILD" = "1" ] || [ ! -x "$BUILD_OUT/obj_dir/simv" ]; then
   echo "[compile] building shared Verilator/UVM image in $BUILD_OUT"
   cd "$BUILD_OUT"
   rm -rf obj_dir
-  docker run --rm -e CCACHE_DISABLE=1 -v "$ROOT:$ROOT" -w "$BUILD_OUT" --user "$(id -u):$(id -g)" verilator/verilator:latest \
+  docker run --rm -e CCACHE_DISABLE=1 -v "$ROOT:$ROOT" -w "$BUILD_OUT" --user "$(id -u):$(id -g)" "$VERILATOR_IMAGE" \
     --binary --timing --assert --coverage -j 2 --top-module tb_top --Mdir obj_dir -o simv \
     -Wno-fatal -Wno-lint -Wno-style +define+UVM_NO_DPI \
     "+incdir+$UVM_HOME" "+incdir+$ROOT/tb" "+incdir+$ROOT/tb/agents/desc" "+incdir+$ROOT/tb/agents/pcie" "+incdir+$ROOT/tb/agents/ram" "+incdir+$ROOT/tb/scoreboard" "+incdir+$ROOT/tb/coverage" "+incdir+$ROOT/tb/env" "+incdir+$ROOT/tb/seq" "+incdir+$ROOT/tb/tests" \
