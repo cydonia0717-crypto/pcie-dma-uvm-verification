@@ -31,6 +31,10 @@ class dma_scoreboard extends uvm_component;
   dma_ref_mem mem; virtual dma_cfg_if cfg_vif;
   dma_expected_op pending[longint unsigned];
   dma_pcie_read_ctx pcie_reads[bit[9:0]];
+  bit [3:0] expected_desc_error[longint unsigned];
+  int unsigned expected_desc_errors_seen;
+  int unsigned expected_completion_errors;
+  int unsigned completion_errors_seen;
 
   int unsigned checks,errors,memrd_count,memwr_count,max_h2c_outstanding;
   int unsigned max_memrd_tlp_bytes,max_memwr_tlp_bytes;
@@ -52,10 +56,30 @@ class dma_scoreboard extends uvm_component;
   function longint unsigned key(dma_dir_e d,bit[7:0] tag); return (longint'(d)<<8)|tag; endfunction
   function int unsigned cfg_bytes(bit[2:0] enc); return 128<<enc; endfunction
 
+  function void expect_descriptor_error(dma_dir_e dir,bit[7:0] tag,bit[3:0] error);
+    expected_desc_error[key(dir,tag)] = error;
+  endfunction
+
   function void compare_and_retire(longint unsigned k);
     dma_expected_op e;
     if(!pending.exists(k)) return;
     e=pending[k];
+
+    if(expected_desc_error.exists(k)) begin
+      if(e.status_error!==expected_desc_error[k]) begin
+        errors++;
+        `uvm_error("SB",$sformatf("descriptor error mismatch dir=%0d tag=%0h exp=%0h act=%0h",
+          e.dir,e.tag,expected_desc_error[k],e.status_error))
+      end else begin
+        expected_desc_errors_seen++;
+      end
+      expected_desc_error.delete(k);
+      checks++;
+      if(e.dir==DMA_H2C) h2c_outstanding--;
+      else c2h_outstanding--;
+      pending.delete(k);
+      return;
+    end
 
     if(e.status_error!=0) begin
       errors++;
@@ -189,7 +213,13 @@ class dma_scoreboard extends uvm_component;
       errors++; `uvm_error("SB_CPL",$sformatf("Requester ID mismatch tag=%0h exp=%h act=%h",o.tag,c.requester_id,o.requester_id))
     end
     if(o.cpl_status!=0) begin
-      errors++; `uvm_error("SB_CPL",$sformatf("unexpected completion status tag=%0h status=%0h",o.tag,o.cpl_status))
+      if(completion_errors_seen < expected_completion_errors) begin
+        completion_errors_seen++;
+        pcie_reads.delete(o.tag);
+        return;
+      end
+      errors++;
+      `uvm_error("SB_CPL",$sformatf("unexpected completion status tag=%0h status=%0h",o.tag,o.cpl_status))
     end
     if(o.byte_count!=c.remaining) begin
       errors++; `uvm_error("SB_CPL",$sformatf("Byte Count mismatch tag=%0h exp=%0d act=%0d",o.tag,c.remaining,o.byte_count))
@@ -262,6 +292,11 @@ class dma_scoreboard extends uvm_component;
       `uvm_error("SB",$sformatf("%0d descriptors still pending",pending.num()))
     if(pcie_reads.num()!=0)
       `uvm_error("SB_TAG",$sformatf("%0d PCIe read tags still active",pcie_reads.num()))
+    if(expected_desc_error.num()!=0)
+      `uvm_error("SB",$sformatf("%0d expected descriptor errors were not observed",expected_desc_error.num()))
+    if(completion_errors_seen!=expected_completion_errors)
+      `uvm_error("SB_CPL",$sformatf("expected %0d completion errors, observed %0d",
+        expected_completion_errors,completion_errors_seen))
   endfunction
 
   function void report_phase(uvm_phase phase);
