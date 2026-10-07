@@ -27,3 +27,4 @@ cov --filter-type branch --write-info "$OUT/branch.info" "$OUT/merged.dat"
 cov --filter-type covergroup --report summary "$OUT/merged.dat" | tee "$OUT/functional_coverage.txt"
 
 python3 "$ROOT/scripts/parse_lcov.py" "$OUT/line.info" "$OUT/branch.info"
+python3 "$ROOT/scripts/parse_covergroup.py" "$OUT/merged.dat"
