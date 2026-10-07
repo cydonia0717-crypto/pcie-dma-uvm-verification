@@ -50,15 +50,15 @@ Direction naming:
 ## Qualification status
 
 Public GitHub Actions qualification is green.  The current evidence baseline is
-Run #74 (head 7711efd2ff809e96e013a36ced4b88266b3a8827).
+Run #89 (head 8c5110e5b186acfad7a8be1da0a690f47a70ca1a).
 
 Measured normal-regression results:
 
-- 13 clean simulation runs
-- 256 completed descriptor end-to-end checks
-- 2,704 Memory Read TLPs
-- 1,109 Memory Write TLPs
-- 41,390 Completion-with-Data packets
+- 14 clean simulation runs
+- 258 completed descriptor end-to-end checks
+- 2,705 Memory Read TLPs
+- 1,110 Memory Write TLPs
+- 41,391 Completion-with-Data packets
 - 2,674 read requests completed through multiple CplD packets
 - 16 simultaneous active PCIe Memory Read tags
 - 11 simultaneous DMA descriptors observed
@@ -69,12 +69,12 @@ Measured normal-regression results:
 
 Coverage from the merged public qualification database:
 
-- reachable functional coverage: 31/31 = 100%
-- raw Verilator covergroup report: 31/33 = 93.9%
+- reachable functional coverage: 48/48 = 100%
+- raw Verilator covergroup report: 48/50 = 96.0%
 - the two raw uncovered bins are intentionally excluded semantic bins:
   an illegal 4 KiB-crossing request and an ignored Completion-status catch-all
 - DUT-scoped line coverage: 818/840 = 97.4%
-- DUT-scoped branch coverage: 200/253 = 79.1%
+- DUT-scoped branch coverage: 208/253 = 82.2%
 
 ## Real RTL issue found by this verification flow
 
