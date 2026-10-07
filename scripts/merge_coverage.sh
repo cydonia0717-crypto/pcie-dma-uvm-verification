@@ -13,9 +13,9 @@ if [ "${#COVS[@]}" -eq 0 ]; then
 fi
 
 echo "[coverage] merging ${#COVS[@]} normal regression databases"
-docker run --rm -v "$ROOT:$ROOT" -w "$ROOT" --user "$(id -u):$(id -g)" "$IMAGE" \
-  verilator_coverage --write "$OUT/merged.dat" "${COVS[@]}"
-docker run --rm -v "$ROOT:$ROOT" -w "$ROOT" --user "$(id -u):$(id -g)" "$IMAGE" \
-  verilator_coverage --write-info "$OUT/coverage.info" "$OUT/merged.dat"
+docker run --rm --entrypoint verilator_coverage -v "$ROOT:$ROOT" -w "$ROOT" --user "$(id -u):$(id -g)" "$IMAGE" \
+  --write "$OUT/merged.dat" "${COVS[@]}"
+docker run --rm --entrypoint verilator_coverage -v "$ROOT:$ROOT" -w "$ROOT" --user "$(id -u):$(id -g)" "$IMAGE" \
+  --write-info "$OUT/coverage.info" "$OUT/merged.dat"
 
 python3 "$ROOT/scripts/parse_lcov.py" "$OUT/coverage.info"
