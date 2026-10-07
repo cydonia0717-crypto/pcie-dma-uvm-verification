@@ -14,6 +14,7 @@ tests=(
   "dma_max_len_test 8"
   "dma_completion_error_test 9"
   "dma_zero_len_test 12"
+  "dma_reset_recovery_test 13"
   "dma_1m_chain_test 10"
   "dma_random_stress_test 11"
   "dma_random_stress_test 29"
