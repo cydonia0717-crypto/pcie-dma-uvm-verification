@@ -12,6 +12,8 @@ class pcie_host_responder extends uvm_component;
   uvm_analysis_port #(pcie_tlp_item) ap;
   pcie_pending_cpl pending[$];
   int cycle;
+  bit cpl_release_armed;
+  int unsigned max_unique_pending_tags;
   bit wr_active;
   longint unsigned wr_addr;
   int unsigned wr_dw_len,wr_dw_seen;
@@ -22,6 +24,18 @@ class pcie_host_responder extends uvm_component;
     if(!uvm_config_db#(virtual pcie_tlp_if)::get(this,"","vif",vif)) `uvm_fatal("PCIE","no vif")
     if(!uvm_config_db#(pcie_host_cfg)::get(this,"","cfg",cfg)) cfg=pcie_host_cfg::type_id::create("cfg");
     if(!uvm_config_db#(dma_ref_mem)::get(this,"","mem",mem)) `uvm_fatal("PCIE","no shared mem")
+  endfunction
+
+  function int unsigned unique_pending_tags();
+    bit seen[1024];
+    int unsigned n=0;
+    foreach(pending[i]) begin
+      if(!seen[pending[i].tag]) begin
+        seen[pending[i].tag]=1;
+        n++;
+      end
+    end
+    return n;
   endfunction
 
   function int first_be_off(bit[3:0] be); for(int i=0;i<4;i++) if(be[i]) return i; return 0; endfunction
@@ -45,6 +59,10 @@ class pcie_host_responder extends uvm_component;
       cpl.addr=a; cpl.byte_len=chunk; cpl.byte_count=remain; cpl.lower_addr=a[6:0]; cpl.cpl_status=3'b000;
       cpl.data='0; for(int i=0;i<chunk;i++) cpl.data[(off+i)*8 +:8]=mem.host_get(a+i);
       p.hdr=cpl.build_cpld_header(); p.data=cpl.data; p.tag=req.tag; p.due_cycle=cycle+$urandom_range(cfg.cpl_max_latency,cfg.cpl_min_latency); pending.push_back(p);
+      if(unique_pending_tags()>max_unique_pending_tags) max_unique_pending_tags=unique_pending_tags();
+      if(!cpl_release_armed && cfg.hold_cpl_until_unique_tags!=0 &&
+         unique_pending_tags()>=cfg.hold_cpl_until_unique_tags)
+        cpl_release_armed=1;
       a+=chunk; remain-=chunk;
     end
   endtask
@@ -73,10 +91,17 @@ class pcie_host_responder extends uvm_component;
     int idx; pcie_pending_cpl p;
     vif.host_cb.rx_cpl_valid<=0; vif.host_cb.rx_cpl_sop<=0; vif.host_cb.rx_cpl_eop<=0; vif.host_cb.rx_cpl_error<=0;
     forever begin @(vif.host_cb); cycle++;
-      if(vif.host_cb.rst) begin vif.host_cb.rx_cpl_valid<=0; continue; end
+      if(vif.host_cb.rst) begin
+        vif.host_cb.rx_cpl_valid<=0;
+        cpl_release_armed=(cfg.hold_cpl_until_unique_tags==0);
+        max_unique_pending_tags=0;
+        continue;
+      end
       if(vif.rx_cpl_valid && !vif.host_cb.rx_cpl_ready) continue;
       vif.host_cb.rx_cpl_valid<=0;
       idx=-1;
+      if(!cpl_release_armed && cfg.hold_cpl_until_unique_tags!=0)
+        continue;
       if(cfg.enable_cross_tag_ooo) begin
         // PCIe split completions for one request/tag are emitted in request order.
         // Reordering is allowed only across independent tags.
