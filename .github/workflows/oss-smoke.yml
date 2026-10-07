@@ -1,0 +1,24 @@
+name: oss-smoke
+on: [workflow_dispatch, push, pull_request]
+jobs:
+  verilator-uvm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bootstrap pinned DUT/UVM
+        run: bash scripts/bootstrap_oss.sh
+      - name: Static checks
+        run: python3 scripts/check_project.py
+      - name: H2C/C2H smoke
+        run: |
+          source .env.oss
+          TEST=dma_smoke_test SEED=1 bash scripts/run_verilator.sh
+      - name: 4KiB split
+        run: |
+          source .env.oss
+          TEST=dma_4k_split_test SEED=2 bash scripts/run_verilator.sh
+      - name: 16-tag pressure
+        run: |
+          source .env.oss
+          TEST=dma_16tag_test SEED=3 bash scripts/run_verilator.sh
