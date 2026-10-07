@@ -43,6 +43,7 @@ for log in sorted(RUN_ROOT.glob("*/run.log")):
     d["saw_1m_chain"] = "1MiB H2C logical DMA completed through 17 descriptors with 16 PCIe tags in flight" in text
     d["saw_zero_len"] = "zero-length H2C/C2H completed with destination sentinels preserved" in text
     d["saw_reset_recovery"] = bool(re.search(r"mid-flight reset flushed \d+ descriptors/\d+ PCIe reads, dropped \d+ stale CplD, and post-reset H2C/C2H completed cleanly", text))
+    d["saw_enable_gating"] = "read/write enable gating held descriptors while disabled and recovered cleanly" in text
     runs.append(d)
 
 if not runs:
@@ -75,6 +76,7 @@ totals = {
     "saw_1m_chain": any(r["saw_1m_chain"] for r in runs),
     "saw_zero_len": any(r["saw_zero_len"] for r in runs),
     "saw_reset_recovery": any(r["saw_reset_recovery"] for r in runs),
+    "saw_enable_gating": any(r["saw_enable_gating"] for r in runs),
 }
 
 requirements = {
@@ -87,6 +89,7 @@ requirements = {
     "one_mib_chained_h2c": totals["saw_1m_chain"],
     "zero_length_semantics": totals["saw_zero_len"],
     "midflight_reset_recovery": totals["saw_reset_recovery"],
+    "read_write_enable_gating": totals["saw_enable_gating"],
     "mrrs_512_observed": totals["max_memrd_tlp"] == 512,
     "mps_256_observed": totals["max_memwr_tlp"] == 256,
 }
