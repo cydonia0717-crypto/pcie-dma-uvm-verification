@@ -16,7 +16,7 @@ The canonical open-source qualification is defined in `scripts/oss_regression.sh
 | `dma_1m_chain_test` | 10 | 1 MiB logical H2C transfer through 17 chained descriptors |
 | `dma_random_stress_test` | 11 | mixed H2C/C2H concurrency, splitting, reorder and backpressure |
 | `dma_zero_len_test` | 12 | source-defined zero-length H2C/C2H semantics and no destination byte modification |
-| `dma_reset_recovery_test` | 13 | reset with 8 active Memory Read tags; flush stale descriptor/TLP/CplD state and prove post-reset H2C/C2H progress |
+| `dma_reset_recovery_test` | 13 | reset with an active Memory Read; flush stale descriptor/TLP/CplD state and prove post-reset H2C/C2H progress |
 | `dma_random_stress_test` | 29 | reproducible mixed-traffic random seed |
 | `dma_random_stress_test` | 47 | reproducible mixed-traffic random seed |
 
