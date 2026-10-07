@@ -133,7 +133,7 @@ DUT 第一笔 Memory Read TLP 的 Length field 变成 0。PCIe 中 Length=0 表�
 
 ## 33. 当前覆盖率怎么解释？
 
-公开合并回归的 reachable functional coverage 是 48/48=100%。Raw covergroup 是 48/50=96.0%，少的两个分别是明确的 illegal 4KiB-cross request bin 和 ignore Completion-status catch-all，所以不放入 closure denominator。DUT scoped line coverage 97.4%，branch coverage 82.2%。
+公开合并回归的 reachable functional coverage 是 51/51=100%。Raw covergroup 是 51/53=96.2%，少的两个分别是明确的 illegal 4KiB-cross request bin 和 ignore Completion-status catch-all，所以不放入 closure denominator。新增的 Tag lifecycle first-use/reuse 和 runtime-reset coverage 也都已命中。DUT scoped line coverage 97.4%，branch coverage 82.2%。
 
 ## 34. 为什么 Branch Coverage 82.2% 还可以收敛？
 
@@ -141,7 +141,7 @@ DUT 第一笔 Memory Read TLP 的 Length field 变成 0。PCIe 中 Length=0 表�
 
 ## 35. 正常 regression 有多少？
 
-当前公开 baseline 是 14 个 clean simulation runs，包括 smoke、4KiB、16-tag、small/unaligned、MRRS/MPS、split/OOO、backpressure、completion error、max length、1MiB chain 和 3 个 random seeds。总计完成 258 个 descriptor end-to-end checks，全部 0 UVM_ERROR / 0 UVM_FATAL。
+当前公开 baseline 是 GitHub Actions Run #110，共 15 个 clean simulation runs，包括 smoke、4KiB、16-tag、small/unaligned、MRRS/MPS、split/OOO、backpressure、completion error、max length、zero-length、mid-flight reset recovery、1MiB chain 和 3 个 random seeds。总计完成 260 个 descriptor end-to-end checks，全部 0 UVM_ERROR / 0 UVM_FATAL。
 
 ## 36. 随机测试不是只跑一个 Seed 吗？
 
@@ -161,4 +161,12 @@ DUT 第一笔 Memory Read TLP 的 Length field 变成 0。PCIe 中 Length=0 表�
 
 ## 40. 你自己完成了哪些内容？
 
-独立搭建 Descriptor Agent、PCIe Host responder/monitor、Segmented RAM Model、Host/Device Reference Model、Scoreboard、PCIe Tag Outstanding tracking、SVA、Functional Coverage、directed/random sequences、GitHub Actions regression/coverage flow，以及最大长度 bug 的定位、local RTL fix 和 negative-control reproducer。开源 DMA RTL 本身不是自己设计的。
+独立搭建 Descriptor Agent、PCIe Host responder/monitor、Segmented RAM Model、Host/Device Reference Model、Scoreboard、PCIe Tag Outstanding tracking、SVA、Functional Coverage、directed/random sequences、runtime-reset recovery、GitHub Actions regression/coverage flow，以及最大长度 bug 的定位、local RTL fix 和 negative-control reproducer。开源 DMA RTL 本身不是自己设计的。
+
+## 41. PCIe Tag 的释放和重复使用怎么验证？
+
+Scoreboard 除了维护 active Tag table、禁止 Tag 在尚未完成时提前复用，还单独记录每个 Tag 的生命周期。16-tag directed test 先证明 16 个 Tag 同时占满，随后 Completion 退休后继续发后续 request，Run #110 在这个用例里观察到 **48 次合法 Tag reuse**；整个 15-run qualification 累计观察到 **2,568 次**，对应 coverage 里 first-use/reuse 两个 bin 都命中。
+
+## 42. Mid-flight Reset Recovery 怎么验证？
+
+这个测试不和 16-tag capacity pressure 绑在一起，而是先让一个真实 H2C descriptor 产生未完成 PCIe read，再扣住 Completion 后打运行时 reset。Run #110 实测 reset 时 Scoreboard flush 了 **1 个 Descriptor 和 2 个 PCIe Read context**，Host responder 丢弃了 **16 个 stale CplD**；reset 后再发新的 H2C/C2H，两边都正常完成，DUT busy 也恢复为 0。这样同时验证了旧事务不会跨 reset 泄漏，以及 reset 后资源能重新初始化并继续前进。
