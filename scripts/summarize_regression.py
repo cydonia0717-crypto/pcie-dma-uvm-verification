@@ -38,6 +38,7 @@ for log in sorted(RUN_ROOT.glob("*/run.log")):
     d["saw_16tag"] = "scoreboard observed 16 simultaneous PCIe Memory Read tags" in text
     d["saw_ooo"] = bool(re.search(r"cross_tag_ooo=[1-9]\d*", text))
     d["saw_maxlen"] = "65535-byte H2C and C2H descriptors completed cleanly" in text
+    d["saw_cpl_error"] = "Unsupported Request completion propagated as DMA error 0xA" in text
     runs.append(d)
 
 if not runs:
@@ -64,6 +65,7 @@ totals = {
     "saw_16tag": any(r["saw_16tag"] for r in runs),
     "saw_ooo": any(r["saw_ooo"] for r in runs),
     "saw_maxlen": any(r["saw_maxlen"] for r in runs),
+    "saw_cpl_error": any(r["saw_cpl_error"] for r in runs),
 }
 
 requirements = {
@@ -71,6 +73,7 @@ requirements = {
     "sixteen_simultaneous_tags": totals["max_pcie_outstanding"] >= 16 and totals["saw_16tag"],
     "cross_tag_ooo_observed": totals["saw_ooo"],
     "max_length_boundary_passed": totals["saw_maxlen"],
+    "completion_error_propagation": totals["saw_cpl_error"],
     "mrrs_512_observed": totals["max_memrd_tlp"] == 512,
     "mps_256_observed": totals["max_memwr_tlp"] == 256,
 }
