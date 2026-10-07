@@ -34,6 +34,7 @@ package dma_uvm_pkg;
   `include "seq/dma_backpressure_seq.sv"
   `include "seq/dma_random_stress_seq.sv"
   `include "seq/dma_max_len_seq.sv"
+  `include "seq/dma_completion_error_seq.sv"
   `include "tests/dma_base_test.sv"
   `include "tests/dma_smoke_test.sv"
   `include "tests/dma_4k_split_test.sv"
@@ -44,4 +45,5 @@ package dma_uvm_pkg;
   `include "tests/dma_backpressure_test.sv"
   `include "tests/dma_random_stress_test.sv"
   `include "tests/dma_max_len_test.sv"
+  `include "tests/dma_completion_error_test.sv"
 endpackage
