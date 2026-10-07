@@ -65,6 +65,10 @@ jobs:
         run: |
           source .env.oss
           TEST=dma_max_len_test SEED=8 bash scripts/run_verilator.sh
+      - name: Zero-length DMA semantics
+        run: |
+          source .env.oss
+          TEST=dma_zero_len_test SEED=12 bash scripts/run_verilator.sh
       - name: 1MiB chained H2C
         run: |
           source .env.oss
