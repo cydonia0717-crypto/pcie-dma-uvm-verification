@@ -114,7 +114,7 @@ class dma_scoreboard extends uvm_component;
   function void mark_c2h_commit(pcie_tlp_item o);
     longint unsigned k,a;
     dma_expected_op e;
-    int matches=0;
+    int overlap_count=0;
 
     // A Memory Write carries no DMA descriptor tag.  Resolve ownership by the
     // non-overlapping destination range of every live C2H descriptor.
@@ -122,7 +122,7 @@ class dma_scoreboard extends uvm_component;
       e=pending[k];
       if(e.dir!=DMA_C2H) continue;
       if(o.addr < e.pcie_addr+e.len && o.addr+o.byte_len > e.pcie_addr) begin
-        matches++;
+        overlap_count++;
         for(int i=0;i<o.byte_len;i++) begin
           a=o.addr+i;
           if(a>=e.pcie_addr && a<e.pcie_addr+e.len) begin
@@ -137,12 +137,12 @@ class dma_scoreboard extends uvm_component;
       end
     end
 
-    if(matches==0) begin
+    if(overlap_count==0) begin
       errors++;
       `uvm_error("SB",$sformatf("completed MemWr does not map to a live C2H descriptor addr=%h len=%0d",o.addr,o.byte_len))
-    end else if(matches>1) begin
+    end else if(overlap_count>1) begin
       errors++;
-      `uvm_error("SB",$sformatf("completed MemWr ambiguously overlaps %0d C2H descriptors addr=%h len=%0d",matches,o.addr,o.byte_len))
+      `uvm_error("SB",$sformatf("completed MemWr ambiguously overlaps %0d C2H descriptors addr=%h len=%0d",overlap_count,o.addr,o.byte_len))
     end
   endfunction
 
