@@ -4,6 +4,7 @@ package dma_uvm_pkg;
   localparam int TLP_DATA_W=256, TLP_HDR_W=128, RAM_ADDR_W=20, RAM_SEG_COUNT=2, RAM_SEG_DATA_W=256, RAM_SEG_BE_W=32, RAM_SEG_ADDR_W=14;
   `uvm_analysis_imp_decl(_desc)
   `uvm_analysis_imp_decl(_tlp)
+  `uvm_analysis_imp_decl(_ram_sb)
   `uvm_analysis_imp_decl(_cov_desc)
   `uvm_analysis_imp_decl(_cov_tlp)
   `uvm_analysis_imp_decl(_cov_ram)
