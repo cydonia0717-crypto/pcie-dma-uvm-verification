@@ -1,6 +1,6 @@
 class pcie_pending_cpl extends uvm_object;
   `uvm_object_utils(pcie_pending_cpl)
-  bit [127:0] hdr; bit [255:0] data; int due_cycle;
+  bit [127:0] hdr; bit [255:0] data; bit [9:0] tag; int due_cycle;
   function new(string name="pcie_pending_cpl"); super.new(name); endfunction
 endclass
 
@@ -44,7 +44,7 @@ class pcie_host_responder extends uvm_component;
       cpl.kind=PCIE_CPLD; cpl.requester_id=req.requester_id; cpl.completer_id=cfg.completer_id; cpl.tag=req.tag;
       cpl.addr=a; cpl.byte_len=chunk; cpl.byte_count=remain; cpl.lower_addr=a[6:0]; cpl.cpl_status=3'b000;
       cpl.data='0; for(int i=0;i<chunk;i++) cpl.data[(off+i)*8 +:8]=mem.host_get(a+i);
-      p.hdr=cpl.build_cpld_header(); p.data=cpl.data; p.due_cycle=cycle+$urandom_range(cfg.cpl_max_latency,cfg.cpl_min_latency); pending.push_back(p);
+      p.hdr=cpl.build_cpld_header(); p.data=cpl.data; p.tag=req.tag; p.due_cycle=cycle+$urandom_range(cfg.cpl_max_latency,cfg.cpl_min_latency); pending.push_back(p);
       a+=chunk; remain-=chunk;
     end
   endtask
@@ -78,7 +78,17 @@ class pcie_host_responder extends uvm_component;
       vif.host_cb.rx_cpl_valid<=0;
       idx=-1;
       if(cfg.enable_cross_tag_ooo) begin
-        int ready_idx[$]; for(int i=0;i<pending.size();i++) if(pending[i].due_cycle<=cycle) ready_idx.push_back(i);
+        // PCIe split completions for one request/tag are emitted in request order.
+        // Reordering is allowed only across independent tags.
+        int ready_idx[$];
+        for(int i=0;i<pending.size();i++) begin
+          bit older_same_tag;
+          older_same_tag=0;
+          for(int j=0;j<i;j++)
+            if(pending[j].tag==pending[i].tag) older_same_tag=1;
+          if(!older_same_tag && pending[i].due_cycle<=cycle)
+            ready_idx.push_back(i);
+        end
         if(ready_idx.size()) idx=ready_idx[$urandom_range(ready_idx.size()-1,0)];
       end else if(pending.size() && pending[0].due_cycle<=cycle) idx=0;
       if(idx>=0) begin p=pending[idx]; pending.delete(idx); vif.host_cb.rx_cpl_hdr<=p.hdr; vif.host_cb.rx_cpl_data<=p.data; vif.host_cb.rx_cpl_error<=0; vif.host_cb.rx_cpl_sop<=1; vif.host_cb.rx_cpl_eop<=1; vif.host_cb.rx_cpl_valid<=1; end
