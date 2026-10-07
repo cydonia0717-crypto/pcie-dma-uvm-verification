@@ -1,0 +1,13 @@
+diff --git a/rtl/dma_if_pcie_rd.v b/rtl/dma_if_pcie_rd.v
+index 5e0eeae..5e0eeae 100644
+--- a/rtl/dma_if_pcie_rd.v
++++ b/rtl/dma_if_pcie_rd.v
+@@ -660,7 +660,7 @@ always @* begin
+     op_table_read_start_en = 1'b0;
+ 
+     // TLP size computation
+-    if (req_op_count_reg + req_pcie_addr_reg[1:0] <= {max_read_request_size_dw_reg, 2'b00}) begin
++    if ({1'b0, req_op_count_reg} + req_pcie_addr_reg[1:0] <= {4'b0, max_read_request_size_dw_reg, 2'b00}) begin
+         // packet smaller than max read request size
+         if (((req_pcie_addr_reg & 12'hfff) + (req_op_count_reg & 12'hfff)) >> 12 != 0 || req_op_count_reg >> 12 != 0) begin
+             // crosses 4k boundary, split on 4K boundary
