@@ -24,6 +24,7 @@ class dma_coverage extends uvm_component;
   bit split_s,ooo_s;
   bit tag_seen[bit[9:0]];
   bit tag_reuse_s;
+  bit runtime_reset_s;
 
   covergroup desc_cg;
     cp_dir: coverpoint dir_s;
@@ -99,6 +100,12 @@ class dma_coverage extends uvm_component;
     }
   endgroup
 
+  covergroup reset_cg;
+    cp_runtime_reset: coverpoint runtime_reset_s {
+      bins observed={1};
+    }
+  endgroup
+
   function new(string name,uvm_component parent);
     super.new(name,parent);
     desc_imp=new("desc_imp",this);
@@ -109,6 +116,7 @@ class dma_coverage extends uvm_component;
     desc_state_cg=new;
     pcie_state_cg=new;
     tag_lifecycle_cg=new;
+    reset_cg=new;
   endfunction
 
   function void build_phase(uvm_phase phase);
@@ -133,8 +141,12 @@ class dma_coverage extends uvm_component;
     forever begin
       @(posedge cfg_vif.clk);
       if(!cfg_vif.rst) saw_reset_deasserted=1;
-      if(cfg_vif.rst && !prev_rst && saw_reset_deasserted)
+      if(cfg_vif.rst && !prev_rst && saw_reset_deasserted) begin
+        runtime_reset_s=1;
+        reset_cg.sample();
         flush_on_reset();
+        runtime_reset_s=0;
+      end
       prev_rst=cfg_vif.rst;
     end
   endtask
