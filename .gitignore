@@ -1,0 +1,11 @@
+third_party/verilog-pcie/
+third_party/uvm/
+.tools/
+out/
+.env.oss
+*.log
+*.vcd
+*.fst
+*.fsdb
+obj_dir/
+__pycache__/
