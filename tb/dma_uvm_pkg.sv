@@ -50,5 +50,6 @@ package dma_uvm_pkg;
   `include "tests/dma_completion_error_test.sv"
   `include "tests/dma_1m_chain_test.sv"
   `include "tests/dma_zero_len_test.sv"
-  `include "tests/dma_reset_recovery_test.sv"\n  `include "tests/dma_enable_gating_test.sv"
+  `include "tests/dma_reset_recovery_test.sv"
+  `include "tests/dma_enable_gating_test.sv"
 endpackage
