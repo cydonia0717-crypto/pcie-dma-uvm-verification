@@ -89,6 +89,40 @@ class pcie_host_responder extends uvm_component;
     end
 
     a=req.addr; remain=req.byte_len; chunks=0;
+
+    // Source-defined zero-length DMA read semantics: the DUT emits a 1-DW
+    // Memory Read with First/Last BE disabled.  It still consumes a successful
+    // Completion to retire the PCIe tag, but suppresses the local RAM write.
+    // Mirror the upstream cocotb model: return one CplD with Byte Count=1 and
+    // one DW of data; no byte is architecturally committed by the DUT.
+    if(remain==0) begin
+      p=pcie_pending_cpl::type_id::create("pc_zero");
+      cpl=pcie_tlp_item::type_id::create("cpl_zero");
+      cpl.kind=PCIE_CPLD;
+      cpl.requester_id=req.requester_id;
+      cpl.completer_id=cfg.completer_id;
+      cpl.tag=req.tag;
+      cpl.addr=a;
+      cpl.byte_len=1;
+      cpl.byte_count=1;
+      cpl.lower_addr=a[6:0];
+      cpl.cpl_status=3'b000;
+      cpl.data='0;
+      cpl.data[a[1:0]*8 +: 8]=mem.host_get(a);
+      p.hdr=cpl.build_cpld_header();
+      p.data=cpl.data;
+      p.tag=req.tag;
+      p.obs=cpl;
+      p.due_cycle=cycle+$urandom_range(cfg.cpl_max_latency,cfg.cpl_min_latency);
+      pending.push_back(p);
+      if(unique_pending_tags()>max_unique_pending_tags)
+        max_unique_pending_tags=unique_pending_tags();
+      if(!cpl_release_armed && cfg.hold_cpl_until_unique_tags!=0 &&
+         unique_pending_tags()>=cfg.hold_cpl_until_unique_tags)
+        cpl_release_armed=1;
+      return;
+    end
+
     while(remain>0) begin
       off=a[1:0];
       // This host model emits one CplD beat per pending item.  Never advertise
