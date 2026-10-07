@@ -17,7 +17,8 @@ SB_RE = re.compile(
     r"max_desc_outstanding=(?P<max_desc>\d+) max_h2c_desc=(?P<max_h2c>\d+) "
     r"max_c2h_desc=(?P<max_c2h>\d+) max_memrd_tlp=(?P<max_memrd>\d+) "
     r"max_memwr_tlp=(?P<max_memwr>\d+) ram_rd_cmds=(?P<ram_rd>\d+) "
-    r"ram_wr_cmds=(?P<ram_wr>\d+) ram_wr_bytes=(?P<ram_wr_bytes>\d+)"
+    r"ram_wr_cmds=(?P<ram_wr>\d+) ram_wr_bytes=(?P<ram_wr_bytes>\d+) "
+    r"unique_pcie_tags=(?P<unique_pcie_tags>\d+) pcie_tag_reuse=(?P<pcie_tag_reuse>\d+)"
 )
 
 def last_int(text: str, key: str) -> int:
@@ -64,6 +65,8 @@ totals = {
     "max_desc_outstanding": max(r["max_desc"] for r in runs),
     "max_memrd_tlp": max(r["max_memrd"] for r in runs),
     "max_memwr_tlp": max(r["max_memwr"] for r in runs),
+    "unique_pcie_tags": max(r["unique_pcie_tags"] for r in runs),
+    "pcie_tag_reuse": sum(r["pcie_tag_reuse"] for r in runs),
     "saw_16tag": any(r["saw_16tag"] for r in runs),
     "saw_ooo": any(r["saw_ooo"] for r in runs),
     "saw_maxlen": any(r["saw_maxlen"] for r in runs),
@@ -75,6 +78,7 @@ totals = {
 requirements = {
     "all_runs_clean": not bad,
     "sixteen_simultaneous_tags": totals["max_pcie_outstanding"] >= 16 and totals["saw_16tag"],
+    "tag_reuse_after_retirement": totals["unique_pcie_tags"] >= 16 and totals["pcie_tag_reuse"] >= 16,
     "cross_tag_ooo_observed": totals["saw_ooo"],
     "max_length_boundary_passed": totals["saw_maxlen"],
     "completion_error_propagation": totals["saw_cpl_error"],
@@ -103,6 +107,8 @@ md = [
     f"- Read requests split into multiple completions: **{totals['split_reads']}**",
     f"- Peak simultaneous PCIe Memory Read tags: **{totals['max_pcie_outstanding']}**",
     f"- Peak simultaneous DMA descriptors: **{totals['max_desc_outstanding']}**",
+    f"- Distinct PCIe tags exercised: **{totals['unique_pcie_tags']}**",
+    f"- Legal PCIe tag reuse events after retirement: **{totals['pcie_tag_reuse']}**",
     f"- Largest Memory Read request: **{totals['max_memrd_tlp']} B**",
     f"- Largest Memory Write request: **{totals['max_memwr_tlp']} B**",
     f"- Device-RAM bytes written by H2C traffic: **{totals['ram_wr_bytes']}**",
