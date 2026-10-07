@@ -15,5 +15,19 @@ module pcie_tlp_assertions(pcie_tlp_if vif,dma_cfg_if cfg);
   property p_wr_4k; @(posedge vif.clk) disable iff(vif.rst) vif.tx_wr_valid&&vif.tx_wr_ready&&vif.tx_wr_sop |-> ((tlp_addr(vif.tx_wr_hdr)[11:0]+tlp_bytes(vif.tx_wr_hdr))<=4096); endproperty
   property p_rd_mrrs; @(posedge vif.clk) disable iff(vif.rst) vif.tx_rd_valid&&vif.tx_rd_ready |-> (tlp_bytes(vif.tx_rd_hdr) <= (128<<cfg.max_read_request_size)); endproperty
   property p_wr_mps; @(posedge vif.clk) disable iff(vif.rst) vif.tx_wr_valid&&vif.tx_wr_ready&&vif.tx_wr_sop |-> (tlp_bytes(vif.tx_wr_hdr) <= (128<<cfg.max_payload_size)); endproperty
-  a_rd_hold: assert property(p_rd_hold); a_wr_hold: assert property(p_wr_hold); a_cpl_hold: assert property(p_cpl_hold); a_rd_4k: assert property(p_rd_4k); a_wr_4k: assert property(p_wr_4k); a_rd_mrrs: assert property(p_rd_mrrs); a_wr_mps: assert property(p_wr_mps);
+  a_rd_hold: assert property(p_rd_hold);
+  a_wr_hold: assert property(p_wr_hold);
+  a_cpl_hold: assert property(p_cpl_hold);
+  a_rd_4k: assert property(p_rd_4k);
+  a_wr_4k: assert property(p_wr_4k);
+  a_rd_mrrs: assert property(p_rd_mrrs)
+    else $error("MRRS violation raw_dw=%0d bytes=%0d cfg_enc=%0d cfg_bytes=%0d addr=%h hdr=%h",
+      (vif.tx_rd_hdr[105:96]==0)?1024:vif.tx_rd_hdr[105:96],
+      tlp_bytes(vif.tx_rd_hdr),cfg.max_read_request_size,
+      (128<<cfg.max_read_request_size),tlp_addr(vif.tx_rd_hdr),vif.tx_rd_hdr);
+  a_wr_mps: assert property(p_wr_mps)
+    else $error("MPS violation raw_dw=%0d bytes=%0d cfg_enc=%0d cfg_bytes=%0d addr=%h hdr=%h",
+      (vif.tx_wr_hdr[105:96]==0)?1024:vif.tx_wr_hdr[105:96],
+      tlp_bytes(vif.tx_wr_hdr),cfg.max_payload_size,
+      (128<<cfg.max_payload_size),tlp_addr(vif.tx_wr_hdr),vif.tx_wr_hdr);
 endmodule
