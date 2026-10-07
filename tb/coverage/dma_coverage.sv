@@ -21,6 +21,8 @@ class dma_coverage extends uvm_component;
   longint unsigned next_issue_order;
   int unsigned desc_out_s,pcie_out_s;
   bit split_s,ooo_s;
+  bit tag_seen[bit[9:0]];
+  bit tag_reuse_s;
 
   covergroup desc_cg;
     cp_dir: coverpoint dir_s;
@@ -89,6 +91,13 @@ class dma_coverage extends uvm_component;
     }
   endgroup
 
+  covergroup tag_lifecycle_cg;
+    cp_tag_lifecycle: coverpoint tag_reuse_s {
+      bins first_use={0};
+      bins reuse={1};
+    }
+  endgroup
+
   function new(string name,uvm_component parent);
     super.new(name,parent);
     desc_imp=new("desc_imp",this);
@@ -98,6 +107,7 @@ class dma_coverage extends uvm_component;
     tlp_cg=new;
     desc_state_cg=new;
     pcie_state_cg=new;
+    tag_lifecycle_cg=new;
   endfunction
 
   function longint unsigned desc_key(dma_dir_e dir,bit[7:0] tag);
@@ -136,6 +146,9 @@ class dma_coverage extends uvm_component;
     end
 
     if(o.kind==PCIE_MEM_RD) begin
+      tag_reuse_s=tag_seen.exists(o.tag);
+      tag_seen[o.tag]=1;
+      tag_lifecycle_cg.sample();
       rd_remaining[o.tag]=(o.byte_len==0)?1:o.byte_len;
       rd_cpl_count[o.tag]=0;
       rd_issue_order[o.tag]=next_issue_order++;
