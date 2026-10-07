@@ -27,3 +27,49 @@ module pcie_tlp_assertions(pcie_tlp_if vif,dma_cfg_if cfg);
     else $error("MPS violation len_field=%0h cfg_enc=%0d hdr=%h",
       vif.tx_wr_hdr[105:96],cfg.max_payload_size,vif.tx_wr_hdr);
 endmodule
+
+module dma_ram_assertions #(
+  parameter int SEG_COUNT=2,
+  parameter int SEL_W=2,
+  parameter int SEG_ADDR_W=14,
+  parameter int SEG_DATA_W=256,
+  parameter int SEG_BE_W=32
+)(dma_ram_if vif);
+  for(genvar g=0; g<SEG_COUNT; g++) begin : g_ram_protocol
+    property p_rd_cmd_hold;
+      @(posedge vif.clk) disable iff(vif.rst)
+      vif.rd_cmd_valid[g] && !vif.rd_cmd_ready[g] |=>
+        vif.rd_cmd_valid[g] &&
+        $stable({
+          vif.rd_cmd_sel[g*SEL_W +: SEL_W],
+          vif.rd_cmd_addr[g*SEG_ADDR_W +: SEG_ADDR_W]
+        });
+    endproperty
+
+    property p_wr_cmd_hold;
+      @(posedge vif.clk) disable iff(vif.rst)
+      vif.wr_cmd_valid[g] && !vif.wr_cmd_ready[g] |=>
+        vif.wr_cmd_valid[g] &&
+        $stable({
+          vif.wr_cmd_sel[g*SEL_W +: SEL_W],
+          vif.wr_cmd_be[g*SEG_BE_W +: SEG_BE_W],
+          vif.wr_cmd_addr[g*SEG_ADDR_W +: SEG_ADDR_W],
+          vif.wr_cmd_data[g*SEG_DATA_W +: SEG_DATA_W]
+        });
+    endproperty
+
+    // The RAM model is part of the verification environment.  Check its
+    // response-side valid/ready behavior as well so backpressure tests cannot
+    // pass with a lossy reactive model.
+    property p_rd_rsp_hold;
+      @(posedge vif.clk) disable iff(vif.rst)
+      vif.rd_resp_valid[g] && !vif.rd_resp_ready[g] |=>
+        vif.rd_resp_valid[g] &&
+        $stable(vif.rd_resp_data[g*SEG_DATA_W +: SEG_DATA_W]);
+    endproperty
+
+    a_rd_cmd_hold: assert property(p_rd_cmd_hold);
+    a_wr_cmd_hold: assert property(p_wr_cmd_hold);
+    a_rd_rsp_hold: assert property(p_rd_rsp_hold);
+  end
+endmodule

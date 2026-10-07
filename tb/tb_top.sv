@@ -37,7 +37,9 @@ module tb_top;
     .status_rd_busy(cfg_if.status_rd_busy),.status_wr_busy(cfg_if.status_wr_busy),.status_error_cor(cfg_if.status_error_cor),.status_error_uncor(cfg_if.status_error_uncor)
   );
 
-  dma_desc_assertions a_desc(desc_if); pcie_tlp_assertions a_tlp(pcie_if,cfg_if);
+  dma_desc_assertions a_desc(desc_if);
+  pcie_tlp_assertions a_tlp(pcie_if,cfg_if);
+  dma_ram_assertions a_ram(ram_if);
   initial begin
     uvm_config_db#(virtual dma_desc_if)::set(null,"uvm_test_top.env.desc.*","vif",desc_if);
     uvm_config_db#(virtual pcie_tlp_if)::set(null,"uvm_test_top.env.host.*","vif",pcie_if);
