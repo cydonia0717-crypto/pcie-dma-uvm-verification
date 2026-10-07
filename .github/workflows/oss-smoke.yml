@@ -11,7 +11,7 @@ concurrency:
 jobs:
   verilator-uvm:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
       BUILD_OUT: ${{ github.workspace }}/out/verilator/ci-build
     steps:
@@ -48,3 +48,29 @@ jobs:
         run: |
           source .env.oss
           TEST=dma_backpressure_test SEED=7 bash scripts/run_verilator.sh
+
+      - name: 65535-byte descriptor boundary
+        run: |
+          source .env.oss
+          TEST=dma_max_len_test SEED=8 bash scripts/run_verilator.sh
+      - name: Mixed random stress seed 11
+        run: |
+          source .env.oss
+          TEST=dma_random_stress_test SEED=11 bash scripts/run_verilator.sh
+      - name: Mixed random stress seed 29
+        run: |
+          source .env.oss
+          TEST=dma_random_stress_test SEED=29 bash scripts/run_verilator.sh
+      - name: Mixed random stress seed 47
+        run: |
+          source .env.oss
+          TEST=dma_random_stress_test SEED=47 bash scripts/run_verilator.sh
+      - name: Archive regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pcie-dma-regression-${{ github.run_number }}
+          path: |
+            out/verilator/runs/**/run.log
+            out/verilator/ci-build/compile.log
+          if-no-files-found: warn
