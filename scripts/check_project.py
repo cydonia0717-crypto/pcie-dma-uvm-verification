@@ -2,7 +2,7 @@
 from pathlib import Path
 import re,sys
 root=Path(__file__).resolve().parents[1]
-required=['README.md','tb/dma_uvm_pkg.sv','tb/tb_top.sv','tb/if/dma_desc_if.sv','tb/if/pcie_tlp_if.sv','tb/if/dma_ram_if.sv','tb/scoreboard/dma_scoreboard.sv','scripts/setup_dut.sh','scripts/run_verilator.sh','docs/Verification_Plan.md']
+required=['README.md','tb/dma_uvm_pkg.sv','tb/tb_top.sv','tb/if/dma_desc_if.sv','tb/if/pcie_tlp_if.sv','tb/if/dma_ram_if.sv','tb/scoreboard/dma_scoreboard.sv','scripts/setup_dut.sh','scripts/run_verilator.sh','scripts/repro_upstream_maxlen_bug.sh','patches/0001-fix-read-count-width-overflow.patch','docs/Verification_Plan.md','docs/Discovered_Bug_MaxLen_Read.md']
 miss=[p for p in required if not (root/p).exists()]
 if miss: print('Missing:',*miss,sep='\n  '); sys.exit(1)
 pkg=(root/'tb/dma_uvm_pkg.sv').read_text()
