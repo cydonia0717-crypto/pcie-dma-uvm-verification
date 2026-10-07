@@ -8,12 +8,15 @@ class dma_scoreboard extends uvm_component;
   `uvm_component_utils(dma_scoreboard)
   uvm_analysis_imp_desc #(dma_desc_obs,dma_scoreboard) desc_imp;
   uvm_analysis_imp_tlp  #(pcie_tlp_item,dma_scoreboard) tlp_imp;
+  uvm_analysis_imp_ram_sb #(dma_ram_obs,dma_scoreboard) ram_imp;
   dma_ref_mem mem; virtual dma_cfg_if cfg_vif;
   dma_expected_op pending[longint unsigned];
   int unsigned checks,errors,memrd_count,memwr_count,max_h2c_outstanding;
+  int unsigned ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count;
+  longint unsigned first_ram_wr_addr,last_ram_wr_addr;
   int unsigned h2c_outstanding;
 
-  function new(string name,uvm_component parent); super.new(name,parent); desc_imp=new("desc_imp",this); tlp_imp=new("tlp_imp",this); endfunction
+  function new(string name,uvm_component parent); super.new(name,parent); desc_imp=new("desc_imp",this); tlp_imp=new("tlp_imp",this); ram_imp=new("ram_imp",this); endfunction
   function void build_phase(uvm_phase phase);
     if(!uvm_config_db#(dma_ref_mem)::get(this,"","mem",mem)) `uvm_fatal("SB","no mem")
     if(!uvm_config_db#(virtual dma_cfg_if)::get(this,"","cfg_vif",cfg_vif)) `uvm_fatal("SB","no cfg vif")
@@ -34,10 +37,29 @@ class dma_scoreboard extends uvm_component;
       if(o.error!=0) begin errors++; `uvm_error("SB",$sformatf("descriptor error tag=%0h error=%0h",o.tag,o.error)); end
       for(int i=0;i<e.len;i++) begin
         byte unsigned act=(e.dir==DMA_H2C)?mem.dev_get(e.ram_addr+i):mem.host_get(e.pcie_addr+i);
-        if(act!==e.exp[i]) begin errors++; `uvm_error("SB",$sformatf("data mismatch dir=%0d tag=%0h byte=%0d exp=%02x act=%02x",e.dir,e.tag,i,e.exp[i],act)); break; end
+        if(act!==e.exp[i]) begin
+          errors++;
+          `uvm_error("SB",$sformatf("data mismatch dir=%0d tag=%0h byte=%0d exp=%02x act=%02x dst=%h ram_wr_cmds=%0d ram_wr_bytes=%0d first_wr=%h last_wr=%h",
+            e.dir,e.tag,i,e.exp[i],act,e.ram_addr+i,ram_wr_cmd_count,ram_wr_byte_count,first_ram_wr_addr,last_ram_wr_addr))
+          break;
+        end
       end
       if(e.dir==DMA_H2C) h2c_outstanding--;
       pending.delete(k);
+    end
+  endfunction
+
+  function void write_ram_sb(dma_ram_obs o);
+    if(o.kind==RAM_READ_CMD) begin
+      ram_rd_cmd_count++;
+    end else if(o.kind==RAM_WRITE_CMD) begin
+      ram_wr_cmd_count++;
+      ram_wr_byte_count += $countones(o.be);
+      if(ram_wr_cmd_count==1) first_ram_wr_addr=o.addr;
+      last_ram_wr_addr=o.addr;
+      if(ram_wr_cmd_count<=8)
+        `uvm_info("SB_RAM",$sformatf("write_cmd[%0d] seg=%0d base=%h be=%08h data_lo=%016h",
+          ram_wr_cmd_count,o.segment,o.addr,o.be,o.data[63:0]),UVM_LOW)
     end
   endfunction
 
@@ -53,6 +75,6 @@ class dma_scoreboard extends uvm_component;
     if(pending.num()!=0) `uvm_error("SB",$sformatf("%0d descriptors still pending",pending.num()))
   endfunction
   function void report_phase(uvm_phase phase);
-    `uvm_info("SB",$sformatf("checks=%0d errors=%0d memrd=%0d memwr=%0d max_h2c_outstanding=%0d",checks,errors,memrd_count,memwr_count,max_h2c_outstanding),UVM_LOW)
+    `uvm_info("SB",$sformatf("checks=%0d errors=%0d memrd=%0d memwr=%0d max_h2c_outstanding=%0d ram_rd_cmds=%0d ram_wr_cmds=%0d ram_wr_bytes=%0d",checks,errors,memrd_count,memwr_count,max_h2c_outstanding,ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count),UVM_LOW)
   endfunction
 endclass
