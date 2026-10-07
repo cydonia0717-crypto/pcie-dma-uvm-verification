@@ -44,24 +44,26 @@ Direction naming:
 - Reference/Scoreboard keeps independent host/device memory images, a live
   descriptor table, and a PCIe-tag Outstanding Request Table.
 - SVA checks ready/valid stability, MRRS/MPS limits, and 4 KiB request rules.
-- Functional coverage tracks direction, length, alignment, TLP class/size and
-  Completion status.
+- Functional coverage tracks direction, length, alignment, TLP class/size,
+  Completion status, outstanding depth, PCIe-tag reuse, and runtime reset.
 
 ## Qualification status
 
 Public GitHub Actions qualification is green.  The current evidence baseline is
-Run #89 (head 8c5110e5b186acfad7a8be1da0a690f47a70ca1a).
+Run #110 (head 3a33ec3fbd2050a09fecebb7c22392101c91eb66).
 
 Measured normal-regression results:
 
-- 14 clean simulation runs
-- 258 completed descriptor end-to-end checks
-- 2,705 Memory Read TLPs
-- 1,110 Memory Write TLPs
-- 41,391 Completion-with-Data packets
-- 2,674 read requests completed through multiple CplD packets
+- 15 clean simulation runs
+- 260 completed descriptor end-to-end checks
+- 2,708 Memory Read TLPs
+- 1,112 Memory Write TLPs
+- 41,399 Completion-with-Data packets
+- 2,675 read requests completed through multiple CplD packets
 - 16 simultaneous active PCIe Memory Read tags
 - 11 simultaneous DMA descriptors observed
+- all 16 PCIe tag values exercised, with 2,568 legal post-retirement reuse events
+- mid-flight reset recovery verified with live descriptor/read contexts and stale-CplD flush
 - 512 B largest Memory Read request / 256 B largest Memory Write request
 - 65,535 B single-descriptor boundary verified in both directions
 - 1 MiB logical H2C transfer verified through 17 chained descriptors
@@ -69,8 +71,8 @@ Measured normal-regression results:
 
 Coverage from the merged public qualification database:
 
-- reachable functional coverage: 48/48 = 100%
-- raw Verilator covergroup report: 48/50 = 96.0%
+- reachable functional coverage: 51/51 = 100%
+- raw Verilator covergroup report: 51/53 = 96.2%
 - the two raw uncovered bins are intentionally excluded semantic bins:
   an illegal 4 KiB-crossing request and an ignored Completion-status catch-all
 - DUT-scoped line coverage: 818/840 = 97.4%
