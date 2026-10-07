@@ -37,7 +37,7 @@ class dma_scoreboard extends uvm_component;
   int unsigned max_pcie_outstanding,cpld_count,split_read_requests;
   int unsigned ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count;
   longint unsigned first_ram_wr_addr,last_ram_wr_addr;
-  int unsigned h2c_outstanding;
+  int unsigned h2c_outstanding,c2h_outstanding,max_desc_outstanding,max_c2h_outstanding;
 
   function new(string name,uvm_component parent);
     super.new(name,parent);
@@ -74,6 +74,7 @@ class dma_scoreboard extends uvm_component;
 
     checks++;
     if(e.dir==DMA_H2C) h2c_outstanding--;
+    else c2h_outstanding--;
     pending.delete(k);
   endfunction
 
@@ -103,9 +104,13 @@ class dma_scoreboard extends uvm_component;
         e.committed[i]=0;
       end
       pending[k]=e;
+      if(pending.num()>max_desc_outstanding) max_desc_outstanding=pending.num();
       if(o.dir==DMA_H2C) begin
         h2c_outstanding++;
         if(h2c_outstanding>max_h2c_outstanding) max_h2c_outstanding=h2c_outstanding;
+      end else begin
+        c2h_outstanding++;
+        if(c2h_outstanding>max_c2h_outstanding) max_c2h_outstanding=c2h_outstanding;
       end
       return;
     end
@@ -260,8 +265,9 @@ class dma_scoreboard extends uvm_component;
   endfunction
 
   function void report_phase(uvm_phase phase);
-    `uvm_info("SB",$sformatf("checks=%0d errors=%0d memrd=%0d memwr=%0d cpld=%0d max_pcie_outstanding=%0d split_reads=%0d max_h2c_desc=%0d max_memrd_tlp=%0d max_memwr_tlp=%0d ram_rd_cmds=%0d ram_wr_cmds=%0d ram_wr_bytes=%0d",
-      checks,errors,memrd_count,memwr_count,cpld_count,max_pcie_outstanding,split_read_requests,max_h2c_outstanding,
-      max_memrd_tlp_bytes,max_memwr_tlp_bytes,ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count),UVM_LOW)
+    `uvm_info("SB",$sformatf("checks=%0d errors=%0d memrd=%0d memwr=%0d cpld=%0d max_pcie_outstanding=%0d split_reads=%0d max_desc_outstanding=%0d max_h2c_desc=%0d max_c2h_desc=%0d max_memrd_tlp=%0d max_memwr_tlp=%0d ram_rd_cmds=%0d ram_wr_cmds=%0d ram_wr_bytes=%0d",
+      checks,errors,memrd_count,memwr_count,cpld_count,max_pcie_outstanding,split_read_requests,max_desc_outstanding,
+      max_h2c_outstanding,max_c2h_outstanding,max_memrd_tlp_bytes,max_memwr_tlp_bytes,
+      ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count),UVM_LOW)
   endfunction
 endclass
