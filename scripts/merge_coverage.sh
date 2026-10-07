@@ -12,10 +12,18 @@ if [ "${#COVS[@]}" -eq 0 ]; then
   exit 2
 fi
 
-echo "[coverage] merging ${#COVS[@]} normal regression databases"
-docker run --rm --entrypoint verilator_coverage -v "$ROOT:$ROOT" -w "$ROOT" --user "$(id -u):$(id -g)" "$IMAGE" \
-  --write "$OUT/merged.dat" "${COVS[@]}"
-docker run --rm --entrypoint verilator_coverage -v "$ROOT:$ROOT" -w "$ROOT" --user "$(id -u):$(id -g)" "$IMAGE" \
-  --write-info "$OUT/coverage.info" "$OUT/merged.dat"
+cov() {
+  docker run --rm --entrypoint verilator_coverage \
+    -v "$ROOT:$ROOT" -w "$ROOT" --user "$(id -u):$(id -g)" "$IMAGE" "$@"
+}
 
-python3 "$ROOT/scripts/parse_lcov.py" "$OUT/coverage.info"
+echo "[coverage] merging ${#COVS[@]} normal regression databases"
+cov --write "$OUT/merged.dat" "${COVS[@]}"
+
+# Keep code-coverage types separate.  A generic --write-info is lossy because
+# it collapses line/branch/expression/toggle points onto source lines.
+cov --filter-type line --write-info "$OUT/line.info" "$OUT/merged.dat"
+cov --filter-type branch --write-info "$OUT/branch.info" "$OUT/merged.dat"
+cov --filter-type covergroup --report summary "$OUT/merged.dat" | tee "$OUT/functional_coverage.txt"
+
+python3 "$ROOT/scripts/parse_lcov.py" "$OUT/line.info" "$OUT/branch.info"
