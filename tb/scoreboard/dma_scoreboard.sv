@@ -45,6 +45,7 @@ class dma_scoreboard extends uvm_component;
   int unsigned ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count;
   longint unsigned first_ram_wr_addr,last_ram_wr_addr;
   int unsigned h2c_outstanding,c2h_outstanding,max_desc_outstanding,max_c2h_outstanding;
+  int unsigned runtime_reset_events,reset_flushed_descriptors,reset_flushed_pcie_reads;
 
   function new(string name,uvm_component parent);
     super.new(name,parent);
@@ -58,6 +59,35 @@ class dma_scoreboard extends uvm_component;
 
   function longint unsigned key(dma_dir_e d,bit[7:0] tag); return (longint'(d)<<8)|tag; endfunction
   function int unsigned cfg_bytes(bit[2:0] enc); return 128<<enc; endfunction
+
+  function void flush_on_reset();
+    reset_flushed_descriptors += pending.num();
+    reset_flushed_pcie_reads += pcie_reads.num();
+    pending.delete();
+    pcie_reads.delete();
+    expected_desc_error.delete();
+    expected_completion_errors=0;
+    completion_errors_seen=0;
+    h2c_outstanding=0;
+    c2h_outstanding=0;
+    pcie_tag_seen.delete();
+    unique_pcie_tags_seen=0;
+    pcie_tag_reuse_count=0;
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    bit saw_reset_deasserted=0;
+    bit prev_rst=1;
+    forever begin
+      @(posedge cfg_vif.clk);
+      if(!cfg_vif.rst) saw_reset_deasserted=1;
+      if(cfg_vif.rst && !prev_rst && saw_reset_deasserted) begin
+        runtime_reset_events++;
+        flush_on_reset();
+      end
+      prev_rst=cfg_vif.rst;
+    end
+  endtask
 
   function void expect_descriptor_error(dma_dir_e dir,bit[7:0] tag,bit[3:0] error);
     expected_desc_error[key(dir,tag)] = error;
