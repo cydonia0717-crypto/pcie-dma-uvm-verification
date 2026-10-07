@@ -3,7 +3,7 @@ class dma_coverage extends uvm_component;
   uvm_analysis_imp_cov_desc #(dma_desc_obs,dma_coverage) desc_imp;
   uvm_analysis_imp_cov_tlp #(pcie_tlp_item,dma_coverage) tlp_imp;
   uvm_analysis_imp_cov_ram #(dma_ram_obs,dma_coverage) ram_imp;
-  dma_dir_e dir_s; int unsigned len_s,align_s; pcie_tlp_kind_e kind_s; int unsigned tlp_len_s; bit cross4k_s;
+  dma_dir_e dir_s; int unsigned len_s,align_s; pcie_tlp_kind_e kind_s; int unsigned tlp_len_s; bit cross4k_s; bit [2:0] cpl_status_s;
 
   covergroup desc_cg;
     cp_dir: coverpoint dir_s;
@@ -15,9 +15,14 @@ class dma_coverage extends uvm_component;
     cp_kind: coverpoint kind_s { bins rd={PCIE_MEM_RD}; bins wr={PCIE_MEM_WR}; bins cpl={PCIE_CPLD}; }
     cp_len: coverpoint tlp_len_s { bins le32={[1:32]}; bins b33_128={[33:128]}; bins b129_256={[129:256]}; bins b257_512={[257:512]}; }
     cp_4k: coverpoint cross4k_s { bins legal={0}; illegal_bins crossed={1}; }
+    cp_cpl_status: coverpoint cpl_status_s iff(kind_s==PCIE_CPLD) {
+      bins successful={3'b000};
+      bins unsupported_request={3'b001};
+      ignore_bins other=default;
+    }
   endgroup
   function new(string name,uvm_component parent); super.new(name,parent); desc_imp=new("desc_imp",this); tlp_imp=new("tlp_imp",this); ram_imp=new("ram_imp",this); desc_cg=new; tlp_cg=new; endfunction
   function void write_cov_desc(dma_desc_obs o); if(!o.is_status) begin dir_s=o.dir; len_s=o.len; align_s=o.pcie_addr[1:0]; desc_cg.sample(); end endfunction
-  function void write_cov_tlp(pcie_tlp_item o); if(o.kind!=PCIE_MEM_WR_DONE) begin kind_s=o.kind; tlp_len_s=o.byte_len; cross4k_s=(((o.addr&'hfff)+o.byte_len)>4096); tlp_cg.sample(); end endfunction
+  function void write_cov_tlp(pcie_tlp_item o); if(o.kind!=PCIE_MEM_WR_DONE) begin kind_s=o.kind; tlp_len_s=o.byte_len; cross4k_s=(((o.addr&'hfff)+o.byte_len)>4096); cpl_status_s=o.cpl_status; tlp_cg.sample(); end endfunction
   function void write_cov_ram(dma_ram_obs o); endfunction
 endclass
