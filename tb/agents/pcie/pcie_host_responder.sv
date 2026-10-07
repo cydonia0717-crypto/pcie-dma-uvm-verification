@@ -53,11 +53,15 @@ class pcie_host_responder extends uvm_component;
 
   task enqueue_completions(bit[127:0] h);
     pcie_tlp_item req,cpl; pcie_pending_cpl p; longint unsigned a;
-    int remain,chunk,off,chunks;
+    int remain,chunk,off,chunks,one_beat_cap;
     req=pcie_tlp_item::type_id::create("rd_req"); req.decode_request(h); req.byte_len=bytes_from_req(h); req.addr=first_byte_addr(h); ap.write(req);
     a=req.addr; remain=req.byte_len; chunks=0;
     while(remain>0) begin
-      off=a[1:0]; chunk=(remain < (cfg.cpl_payload_max-off)) ? remain : (cfg.cpl_payload_max-off);
+      off=a[1:0];
+      // This host model emits one CplD beat per pending item.  Never advertise
+      // more payload than the 256-bit (32-byte) interface can carry in one beat.
+      one_beat_cap=(cfg.cpl_payload_max<32)?cfg.cpl_payload_max:32;
+      chunk=(remain < (one_beat_cap-off)) ? remain : (one_beat_cap-off);
       p=pcie_pending_cpl::type_id::create("pc"); cpl=pcie_tlp_item::type_id::create("cpl");
       cpl.kind=PCIE_CPLD; cpl.requester_id=req.requester_id; cpl.completer_id=cfg.completer_id; cpl.tag=req.tag;
       cpl.addr=a; cpl.byte_len=chunk; cpl.byte_count=remain; cpl.lower_addr=a[6:0]; cpl.cpl_status=3'b000;

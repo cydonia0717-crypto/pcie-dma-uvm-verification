@@ -4,7 +4,7 @@ class dma_split_ooo_test extends dma_base_test;
   task run_phase(uvm_phase phase);
     dma_ooo_seq seq;
     phase.raise_objection(this);
-    env.host.rsp.cfg.cpl_payload_max=64;
+    env.host.rsp.cfg.cpl_payload_max=32;
     env.host.rsp.cfg.cpl_min_latency=2;
     env.host.rsp.cfg.cpl_max_latency=2;
     env.host.rsp.cfg.hold_cpl_until_unique_tags=4;
