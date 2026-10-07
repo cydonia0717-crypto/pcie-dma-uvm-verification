@@ -8,6 +8,6 @@ class dma_env extends uvm_env;
     desc=dma_desc_agent::type_id::create("desc",this); host=pcie_host_agent::type_id::create("host",this); ram=dma_ram_agent::type_id::create("ram",this); sb=dma_scoreboard::type_id::create("sb",this); cov=dma_coverage::type_id::create("cov",this);
   endfunction
   function void connect_phase(uvm_phase phase);
-    desc.mon.ap.connect(sb.desc_imp); desc.mon.ap.connect(cov.desc_imp); host.rsp.ap.connect(sb.tlp_imp); host.rsp.ap.connect(cov.tlp_imp); ram.model.ap.connect(cov.ram_imp);
+    desc.mon.ap.connect(sb.desc_imp); desc.mon.ap.connect(cov.desc_imp); host.rsp.ap.connect(sb.tlp_imp); host.rsp.ap.connect(cov.tlp_imp); ram.model.ap.connect(cov.ram_imp); ram.model.ap.connect(sb.ram_imp);
   endfunction
 endclass
