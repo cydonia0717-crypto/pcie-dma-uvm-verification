@@ -26,6 +26,7 @@
 | P22 | max descriptor length | near 64 KiB | no counter overflow |
 | P23 | large logical DMA | chain descriptors to 1 MiB | aggregate end-to-end data integrity |
 | P24 | random stress | constrained mixed traffic | scoreboard clean across seeds |
+| P25 | PCIe tag lifecycle / reuse | saturate 16-tag pool then continue reads | all 16 tag values observed; no active-tag alias; legal post-retirement reuse observed |
 
 ## Closure criteria
 
