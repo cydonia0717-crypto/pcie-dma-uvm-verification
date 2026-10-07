@@ -21,10 +21,13 @@ class dma_16tag_test extends dma_base_test;
     repeat(15000) @(posedge cfg_vif.clk);
 
     if(env.host.rsp.max_unique_pending_tags!=16)
-      `uvm_error("16TAG",$sformatf("expected 16 simultaneous PCIe request tags, observed %0d",
+      `uvm_error("16TAG",$sformatf("host responder expected 16 simultaneous PCIe request tags, observed %0d",
         env.host.rsp.max_unique_pending_tags))
+    if(env.sb.max_pcie_outstanding!=16)
+      `uvm_error("16TAG",$sformatf("scoreboard outstanding table expected depth 16, observed %0d",
+        env.sb.max_pcie_outstanding))
     else
-      `uvm_info("16TAG","observed 16 simultaneous PCIe Memory Read tags",UVM_LOW)
+      `uvm_info("16TAG","scoreboard observed 16 simultaneous PCIe Memory Read tags",UVM_LOW)
 
     phase.drop_objection(this);
   endtask
