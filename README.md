@@ -91,10 +91,11 @@ local patch has been accepted upstream.
 See:
 
 - docs/Verification_Plan.md
-- docs/Regression_Report.md
-- docs/Coverage_Report.md
+- docs/Testcase_List.md
+- docs/Regression_Evidence.md
 - docs/Discovered_Bug_MaxLen_Read.md
 - docs/Resume_Target_CN.md
+- docs/Interview_QA_CN.md
 - docs/Commercial_Simulator_Flow.md
 
 ## Run
