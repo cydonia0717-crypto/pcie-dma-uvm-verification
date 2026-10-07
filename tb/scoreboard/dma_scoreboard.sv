@@ -197,6 +197,14 @@ class dma_scoreboard extends uvm_component;
 
   function void start_pcie_read(pcie_tlp_item o);
     dma_pcie_read_ctx c;
+    // Fixed qualification instantiates exactly 16 requester tags with
+    // extended tags disabled.  Catch any DUT tag escaping that pool before
+    // it can alias an associative-array context.
+    if(o.tag>=16) begin
+      errors++;
+      `uvm_error("SB_TAG",$sformatf("PCIe read tag outside configured 16-tag pool tag=%0h",o.tag))
+      return;
+    end
     if(pcie_reads.exists(o.tag)) begin
       errors++;
       `uvm_error("SB_TAG",$sformatf("PCIe read tag reused while active tag=%0h old_remaining=%0d",
