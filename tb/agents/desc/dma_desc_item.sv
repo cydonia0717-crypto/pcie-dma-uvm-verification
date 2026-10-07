@@ -7,7 +7,7 @@ class dma_desc_item extends uvm_sequence_item;
   rand int unsigned len;
   rand bit [7:0] tag;
 
-  constraint c_len { len inside {[1:16'hffff]}; }
+  constraint c_len { len inside {[0:16'hffff]}; }
 
   `uvm_object_utils_begin(dma_desc_item)
     `uvm_field_enum(dma_dir_e,dir,UVM_DEFAULT)
