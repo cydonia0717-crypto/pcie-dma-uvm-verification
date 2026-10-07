@@ -133,15 +133,15 @@ DUT 第一笔 Memory Read TLP 的 Length field 变成 0。PCIe 中 Length=0 表�
 
 ## 33. 当前覆盖率怎么解释？
 
-公开合并回归的 reachable functional coverage 是 31/31=100%。Raw covergroup 是 31/33=93.9%，少的两个分别是明确的 illegal 4KiB-cross request bin 和 ignore Completion-status catch-all，所以不放入 closure denominator。DUT scoped line coverage 97.4%，branch coverage 79.1%。
+公开合并回归的 reachable functional coverage 是 48/48=100%。Raw covergroup 是 48/50=96.0%，少的两个分别是明确的 illegal 4KiB-cross request bin 和 ignore Completion-status catch-all，所以不放入 closure denominator。DUT scoped line coverage 97.4%，branch coverage 82.2%。
 
-## 34. 为什么 Branch Coverage 只有 79.1% 还可以收敛？
+## 34. 为什么 Branch Coverage 82.2% 还可以收敛？
 
 这个 RTL 是参数化通用 DMA engine，固定 qualification 配置关闭了部分分支，例如不同 address format、扩展 tag/某些 flow-control/parameter-specific 路径。Branch Coverage 需要结合 feature scope 做 hole review，不能为了数字去改变项目配置。功能 closure 和协议关键路径已经由 vPlan、SVA、directed/random regression共同覆盖。
 
 ## 35. 正常 regression 有多少？
 
-当前公开 baseline 是 13 个 clean simulation runs，包括 smoke、4KiB、16-tag、small/unaligned、MRRS/MPS、split/OOO、backpressure、completion error、max length、1MiB chain 和 3 个 random seeds。总计完成 256 个 descriptor end-to-end checks，全部 0 UVM_ERROR / 0 UVM_FATAL。
+当前公开 baseline 是 14 个 clean simulation runs，包括 smoke、4KiB、16-tag、small/unaligned、MRRS/MPS、split/OOO、backpressure、completion error、max length、1MiB chain 和 3 个 random seeds。总计完成 258 个 descriptor end-to-end checks，全部 0 UVM_ERROR / 0 UVM_FATAL。
 
 ## 36. 随机测试不是只跑一个 Seed 吗？
 
