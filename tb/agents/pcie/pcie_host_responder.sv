@@ -74,7 +74,7 @@ class pcie_host_responder extends uvm_component;
     vif.host_cb.rx_cpl_valid<=0; vif.host_cb.rx_cpl_sop<=0; vif.host_cb.rx_cpl_eop<=0; vif.host_cb.rx_cpl_error<=0;
     forever begin @(vif.host_cb); cycle++;
       if(vif.host_cb.rst) begin vif.host_cb.rx_cpl_valid<=0; continue; end
-      if(vif.host_cb.rx_cpl_valid && !vif.host_cb.rx_cpl_ready) continue;
+      if(vif.rx_cpl_valid && !vif.host_cb.rx_cpl_ready) continue;
       vif.host_cb.rx_cpl_valid<=0;
       idx=-1;
       if(cfg.enable_cross_tag_ooo) begin
@@ -88,7 +88,7 @@ class pcie_host_responder extends uvm_component;
   task run_phase(uvm_phase phase);
     vif.host_cb.tx_rd_ready<=0; vif.host_cb.tx_wr_ready<=0;
     fork
-      begin forever begin @(vif.host_cb); if(vif.host_cb.rst) begin vif.host_cb.tx_rd_ready<=0; vif.host_cb.tx_wr_ready<=0; end else begin vif.host_cb.tx_rd_ready<=($urandom_range(99)>=cfg.rd_ready_stall_pct); vif.host_cb.tx_wr_ready<=($urandom_range(99)>=cfg.wr_ready_stall_pct); if(vif.host_cb.tx_rd_valid&&vif.host_cb.tx_rd_ready) enqueue_completions(vif.host_cb.tx_rd_hdr); if(vif.host_cb.tx_wr_valid&&vif.host_cb.tx_wr_ready) capture_write_beat(); end end end
+      begin forever begin @(vif.host_cb); if(vif.host_cb.rst) begin vif.host_cb.tx_rd_ready<=0; vif.host_cb.tx_wr_ready<=0; end else begin vif.host_cb.tx_rd_ready<=($urandom_range(99)>=cfg.rd_ready_stall_pct); vif.host_cb.tx_wr_ready<=($urandom_range(99)>=cfg.wr_ready_stall_pct); if(vif.host_cb.tx_rd_valid&&vif.tx_rd_ready) enqueue_completions(vif.host_cb.tx_rd_hdr); if(vif.host_cb.tx_wr_valid&&vif.tx_wr_ready) capture_write_beat(); end end end
       drive_completions();
     join
   endtask
