@@ -49,6 +49,10 @@ jobs:
           source .env.oss
           TEST=dma_backpressure_test SEED=7 bash scripts/run_verilator.sh
 
+      - name: Completion error propagation
+        run: |
+          source .env.oss
+          TEST=dma_completion_error_test SEED=9 bash scripts/run_verilator.sh
       - name: 65535-byte descriptor boundary
         run: |
           source .env.oss
