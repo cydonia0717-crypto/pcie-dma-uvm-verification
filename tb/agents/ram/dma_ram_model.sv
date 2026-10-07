@@ -17,13 +17,13 @@ class dma_ram_model extends uvm_component;
       vif.ram_cb.rd_cmd_ready <= {2{($urandom_range(99)>=rd_stall_pct)}};
       vif.ram_cb.wr_cmd_ready <= {2{($urandom_range(99)>=wr_stall_pct)}};
       for(int s=0;s<2;s++) begin
-        if(vif.ram_cb.rd_cmd_valid[s] && vif.ram_cb.rd_cmd_ready[s]) begin
+        if(vif.ram_cb.rd_cmd_valid[s] && vif.rd_cmd_ready[s]) begin
           base=base_addr(s,vif.ram_cb.rd_cmd_addr[s*14 +:14]); for(int i=0;i<32;i++) rd_data_q[s][i*8 +:8]=mem.dev_get(base+i); rd_pending[s]=1;
           o=new("rdcmd"); o.kind=RAM_READ_CMD; o.segment=s; o.addr=base; ap.write(o);
         end
-        if(rd_pending[s] && (!vif.ram_cb.rd_resp_valid[s] || vif.ram_cb.rd_resp_ready[s])) begin vif.ram_cb.rd_resp_data[s*256 +:256]<=rd_data_q[s]; vif.ram_cb.rd_resp_valid[s]<=1; rd_pending[s]=0; end
-        else if(vif.ram_cb.rd_resp_valid[s] && vif.ram_cb.rd_resp_ready[s]) vif.ram_cb.rd_resp_valid[s]<=0;
-        if(vif.ram_cb.wr_cmd_valid[s] && vif.ram_cb.wr_cmd_ready[s]) begin
+        if(rd_pending[s] && (!vif.rd_resp_valid[s] || vif.ram_cb.rd_resp_ready[s])) begin vif.ram_cb.rd_resp_data[s*256 +:256]<=rd_data_q[s]; vif.ram_cb.rd_resp_valid[s]<=1; rd_pending[s]=0; end
+        else if(vif.rd_resp_valid[s] && vif.ram_cb.rd_resp_ready[s]) vif.ram_cb.rd_resp_valid[s]<=0;
+        if(vif.ram_cb.wr_cmd_valid[s] && vif.wr_cmd_ready[s]) begin
           base=base_addr(s,vif.ram_cb.wr_cmd_addr[s*14 +:14]);
           for(int i=0;i<32;i++) if(vif.ram_cb.wr_cmd_be[s*32+i]) mem.dev_put(base+i,vif.ram_cb.wr_cmd_data[(s*256+i*8)+:8]);
           vif.ram_cb.wr_done[s]<=1; o=new("wrcmd"); o.kind=RAM_WRITE_CMD; o.segment=s; o.addr=base; o.data=vif.ram_cb.wr_cmd_data[s*256 +:256]; o.be=vif.ram_cb.wr_cmd_be[s*32 +:32]; ap.write(o);
