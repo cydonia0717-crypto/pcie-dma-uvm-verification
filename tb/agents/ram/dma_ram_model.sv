@@ -2,6 +2,7 @@ class dma_ram_model extends uvm_component;
   `uvm_component_utils(dma_ram_model)
   virtual dma_ram_if vif; dma_ref_mem mem; uvm_analysis_port #(dma_ram_obs) ap;
   int unsigned rd_stall_pct=0,wr_stall_pct=0;
+  int unsigned rd_stall_cycles,wr_stall_cycles;
   bit [1:0] rd_pending;
   bit [1:0][255:0] rd_data_q;
   function new(string name,uvm_component parent); super.new(name,parent); ap=new("ap",this); endfunction
@@ -16,6 +17,8 @@ class dma_ram_model extends uvm_component;
       if(vif.ram_cb.rst) begin vif.ram_cb.rd_cmd_ready<='0; vif.ram_cb.wr_cmd_ready<='0; vif.ram_cb.rd_resp_valid<='0; rd_pending='0; continue; end
       vif.ram_cb.rd_cmd_ready <= {2{($urandom_range(99)>=rd_stall_pct)}};
       vif.ram_cb.wr_cmd_ready <= {2{($urandom_range(99)>=wr_stall_pct)}};
+      if((|vif.ram_cb.rd_cmd_valid) && !(|vif.rd_cmd_ready)) rd_stall_cycles++;
+      if((|vif.ram_cb.wr_cmd_valid) && !(|vif.wr_cmd_ready)) wr_stall_cycles++;
       for(int s=0;s<2;s++) begin
         if(vif.ram_cb.rd_cmd_valid[s] && vif.rd_cmd_ready[s]) begin
           base=base_addr(s,vif.ram_cb.rd_cmd_addr[s*14 +:14]); for(int i=0;i<32;i++) rd_data_q[s][i*8 +:8]=mem.dev_get(base+i); rd_pending[s]=1;

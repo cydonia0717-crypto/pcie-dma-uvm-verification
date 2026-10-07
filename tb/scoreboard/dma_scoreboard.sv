@@ -12,6 +12,7 @@ class dma_scoreboard extends uvm_component;
   dma_ref_mem mem; virtual dma_cfg_if cfg_vif;
   dma_expected_op pending[longint unsigned];
   int unsigned checks,errors,memrd_count,memwr_count,max_h2c_outstanding;
+  int unsigned max_memrd_tlp_bytes,max_memwr_tlp_bytes;
   int unsigned ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count;
   longint unsigned first_ram_wr_addr,last_ram_wr_addr;
   int unsigned h2c_outstanding;
@@ -65,8 +66,13 @@ class dma_scoreboard extends uvm_component;
 
   function void write_tlp(pcie_tlp_item o);
     int unsigned lim;
-    if(o.kind==PCIE_MEM_RD) begin memrd_count++; lim=cfg_bytes(cfg_vif.max_read_request_size); end
-    else if(o.kind==PCIE_MEM_WR) begin memwr_count++; lim=cfg_bytes(cfg_vif.max_payload_size); end else return;
+    if(o.kind==PCIE_MEM_RD) begin
+      memrd_count++; lim=cfg_bytes(cfg_vif.max_read_request_size);
+      if(o.byte_len>max_memrd_tlp_bytes) max_memrd_tlp_bytes=o.byte_len;
+    end else if(o.kind==PCIE_MEM_WR) begin
+      memwr_count++; lim=cfg_bytes(cfg_vif.max_payload_size);
+      if(o.byte_len>max_memwr_tlp_bytes) max_memwr_tlp_bytes=o.byte_len;
+    end else return;
     if(o.byte_len>lim) begin errors++; `uvm_error("SB",$sformatf("TLP length %0d exceeds limit %0d",o.byte_len,lim)); end
     if(((o.addr & 64'hfff)+o.byte_len)>4096) begin errors++; `uvm_error("SB",$sformatf("TLP crosses 4KiB addr=%h len=%0d",o.addr,o.byte_len)); end
   endfunction
@@ -75,6 +81,7 @@ class dma_scoreboard extends uvm_component;
     if(pending.num()!=0) `uvm_error("SB",$sformatf("%0d descriptors still pending",pending.num()))
   endfunction
   function void report_phase(uvm_phase phase);
-    `uvm_info("SB",$sformatf("checks=%0d errors=%0d memrd=%0d memwr=%0d max_h2c_outstanding=%0d ram_rd_cmds=%0d ram_wr_cmds=%0d ram_wr_bytes=%0d",checks,errors,memrd_count,memwr_count,max_h2c_outstanding,ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count),UVM_LOW)
+    `uvm_info("SB",$sformatf("checks=%0d errors=%0d memrd=%0d memwr=%0d max_h2c_outstanding=%0d max_memrd_tlp=%0d max_memwr_tlp=%0d ram_rd_cmds=%0d ram_wr_cmds=%0d ram_wr_bytes=%0d",
+      checks,errors,memrd_count,memwr_count,max_h2c_outstanding,max_memrd_tlp_bytes,max_memwr_tlp_bytes,ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count),UVM_LOW)
   endfunction
 endclass
