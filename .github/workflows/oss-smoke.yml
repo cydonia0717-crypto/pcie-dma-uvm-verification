@@ -65,6 +65,10 @@ jobs:
         run: |
           source .env.oss
           TEST=dma_random_stress_test SEED=47 bash scripts/run_verilator.sh
+      - name: Reproduce discovered upstream max-length read bug
+        run: |
+          source .env.oss
+          bash scripts/repro_upstream_maxlen_bug.sh
       - name: Archive regression evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -72,5 +76,8 @@ jobs:
           name: pcie-dma-regression-${{ github.run_number }}
           path: |
             out/verilator/runs/**/run.log
+            out/verilator/runs/**/coverage.dat
+            out/verilator/repro_upstream_maxlen_bug/run.log
+            out/verilator/repro-upstream-build/compile.log
             out/verilator/ci-build/compile.log
           if-no-files-found: warn
