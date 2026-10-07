@@ -1,4 +1,4 @@
-typedef enum int {PCIE_MEM_RD, PCIE_MEM_WR, PCIE_CPLD} pcie_tlp_kind_e;
+typedef enum int {PCIE_MEM_RD, PCIE_MEM_WR, PCIE_CPLD, PCIE_MEM_WR_DONE} pcie_tlp_kind_e;
 
 class pcie_tlp_item extends uvm_sequence_item;
   pcie_tlp_kind_e kind;
@@ -32,8 +32,8 @@ class pcie_tlp_item extends uvm_sequence_item;
   function bit [127:0] build_cpld_header();
     bit [127:0] h='0;
     int unsigned dw_len=(byte_len + lower_addr[1:0] + 3)/4;
-    h[127:125]=3'b010;     // 3DW + data
-    h[124:120]=5'b01010;   // completion
+    h[127:125]=3'b010;
+    h[124:120]=5'b01010;
     h[105:96]=(dw_len==1024)?10'd0:dw_len[9:0];
     h[95:80]=completer_id;
     h[79:77]=cpl_status;

@@ -1,24 +1,50 @@
 name: oss-smoke
-on: [workflow_dispatch, push, pull_request]
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+concurrency:
+  group: pcie-dma-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verilator-uvm:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      BUILD_OUT: ${{ github.workspace }}/out/verilator/ci-build
     steps:
       - uses: actions/checkout@v4
       - name: Bootstrap pinned DUT/UVM
         run: bash scripts/bootstrap_oss.sh
       - name: Static checks
         run: python3 scripts/check_project.py
-      - name: H2C/C2H smoke
+      - name: Compile + H2C/C2H smoke
         run: |
           source .env.oss
-          TEST=dma_smoke_test SEED=1 bash scripts/run_verilator.sh
+          FORCE_REBUILD=1 TEST=dma_smoke_test SEED=1 bash scripts/run_verilator.sh
       - name: 4KiB split
         run: |
           source .env.oss
           TEST=dma_4k_split_test SEED=2 bash scripts/run_verilator.sh
-      - name: 16-tag pressure
+      - name: 16 simultaneous PCIe tags
         run: |
           source .env.oss
           TEST=dma_16tag_test SEED=3 bash scripts/run_verilator.sh
+      - name: Small and unaligned transfers
+        run: |
+          source .env.oss
+          TEST=dma_small_unaligned_test SEED=4 bash scripts/run_verilator.sh
+      - name: MRRS 512B and MPS 256B
+        run: |
+          source .env.oss
+          TEST=dma_limits_test SEED=5 bash scripts/run_verilator.sh
+      - name: Split completion + cross-tag OOO
+        run: |
+          source .env.oss
+          TEST=dma_split_ooo_test SEED=6 bash scripts/run_verilator.sh
+      - name: PCIe + RAM backpressure
+        run: |
+          source .env.oss
+          TEST=dma_backpressure_test SEED=7 bash scripts/run_verilator.sh

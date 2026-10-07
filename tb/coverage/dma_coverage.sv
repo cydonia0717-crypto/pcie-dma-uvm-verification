@@ -18,6 +18,6 @@ class dma_coverage extends uvm_component;
   endgroup
   function new(string name,uvm_component parent); super.new(name,parent); desc_imp=new("desc_imp",this); tlp_imp=new("tlp_imp",this); ram_imp=new("ram_imp",this); desc_cg=new; tlp_cg=new; endfunction
   function void write_cov_desc(dma_desc_obs o); if(!o.is_status) begin dir_s=o.dir; len_s=o.len; align_s=o.pcie_addr[1:0]; desc_cg.sample(); end endfunction
-  function void write_cov_tlp(pcie_tlp_item o); kind_s=o.kind; tlp_len_s=o.byte_len; cross4k_s=(((o.addr&'hfff)+o.byte_len)>4096); tlp_cg.sample(); endfunction
+  function void write_cov_tlp(pcie_tlp_item o); if(o.kind!=PCIE_MEM_WR_DONE) begin kind_s=o.kind; tlp_len_s=o.byte_len; cross4k_s=(((o.addr&'hfff)+o.byte_len)>4096); tlp_cg.sample(); end endfunction
   function void write_cov_ram(dma_ram_obs o); endfunction
 endclass
