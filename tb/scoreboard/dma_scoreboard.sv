@@ -12,6 +12,17 @@ class dma_expected_op extends uvm_object;
   function new(string name="dma_expected_op"); super.new(name); endfunction
 endclass
 
+class dma_pcie_read_ctx extends uvm_object;
+  `uvm_object_utils(dma_pcie_read_ctx)
+  bit [9:0] tag;
+  bit [15:0] requester_id;
+  longint unsigned start_addr;
+  longint unsigned next_addr;
+  int unsigned remaining;
+  int unsigned cpl_count;
+  function new(string name="dma_pcie_read_ctx"); super.new(name); endfunction
+endclass
+
 class dma_scoreboard extends uvm_component;
   `uvm_component_utils(dma_scoreboard)
   uvm_analysis_imp_desc #(dma_desc_obs,dma_scoreboard) desc_imp;
@@ -19,8 +30,11 @@ class dma_scoreboard extends uvm_component;
   uvm_analysis_imp_ram_sb #(dma_ram_obs,dma_scoreboard) ram_imp;
   dma_ref_mem mem; virtual dma_cfg_if cfg_vif;
   dma_expected_op pending[longint unsigned];
+  dma_pcie_read_ctx pcie_reads[bit[9:0]];
+
   int unsigned checks,errors,memrd_count,memwr_count,max_h2c_outstanding;
   int unsigned max_memrd_tlp_bytes,max_memwr_tlp_bytes;
+  int unsigned max_pcie_outstanding,cpld_count,split_read_requests;
   int unsigned ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count;
   longint unsigned first_ram_wr_addr,last_ram_wr_addr;
   int unsigned h2c_outstanding;
@@ -116,8 +130,6 @@ class dma_scoreboard extends uvm_component;
     dma_expected_op e;
     int overlap_count=0;
 
-    // A Memory Write carries no DMA descriptor tag.  Resolve ownership by the
-    // non-overlapping destination range of every live C2H descriptor.
     foreach(pending[k]) begin
       e=pending[k];
       if(e.dir!=DMA_C2H) continue;
@@ -146,6 +158,56 @@ class dma_scoreboard extends uvm_component;
     end
   endfunction
 
+  function void start_pcie_read(pcie_tlp_item o);
+    dma_pcie_read_ctx c;
+    if(pcie_reads.exists(o.tag)) begin
+      errors++;
+      `uvm_error("SB_TAG",$sformatf("PCIe read tag reused while active tag=%0h old_remaining=%0d",
+        o.tag,pcie_reads[o.tag].remaining))
+      return;
+    end
+    c=dma_pcie_read_ctx::type_id::create("rd_ctx");
+    c.tag=o.tag; c.requester_id=o.requester_id; c.start_addr=o.addr; c.next_addr=o.addr; c.remaining=o.byte_len;
+    pcie_reads[o.tag]=c;
+    if(pcie_reads.num()>max_pcie_outstanding) max_pcie_outstanding=pcie_reads.num();
+  endfunction
+
+  function void consume_completion(pcie_tlp_item o);
+    dma_pcie_read_ctx c;
+    if(!pcie_reads.exists(o.tag)) begin
+      errors++;
+      `uvm_error("SB_CPL",$sformatf("completion for inactive PCIe tag=%0h",o.tag))
+      return;
+    end
+    c=pcie_reads[o.tag];
+    if(o.requester_id!=c.requester_id) begin
+      errors++; `uvm_error("SB_CPL",$sformatf("Requester ID mismatch tag=%0h exp=%h act=%h",o.tag,c.requester_id,o.requester_id))
+    end
+    if(o.cpl_status!=0) begin
+      errors++; `uvm_error("SB_CPL",$sformatf("unexpected completion status tag=%0h status=%0h",o.tag,o.cpl_status))
+    end
+    if(o.byte_count!=c.remaining) begin
+      errors++; `uvm_error("SB_CPL",$sformatf("Byte Count mismatch tag=%0h exp=%0d act=%0d",o.tag,c.remaining,o.byte_count))
+    end
+    if(o.lower_addr!=c.next_addr[6:0]) begin
+      errors++; `uvm_error("SB_CPL",$sformatf("Lower Address mismatch tag=%0h exp=%0h act=%0h",o.tag,c.next_addr[6:0],o.lower_addr))
+    end
+    if(o.byte_len==0 || o.byte_len>c.remaining) begin
+      errors++;
+      `uvm_error("SB_CPL",$sformatf("invalid completion length tag=%0h len=%0d remaining=%0d",o.tag,o.byte_len,c.remaining))
+      return;
+    end
+
+    c.cpl_count++;
+    c.next_addr += o.byte_len;
+    c.remaining -= o.byte_len;
+    cpld_count++;
+    if(c.remaining==0) begin
+      if(c.cpl_count>1) split_read_requests++;
+      pcie_reads.delete(o.tag);
+    end
+  endfunction
+
   function void write_ram_sb(dma_ram_obs o);
     if(o.kind==RAM_READ_CMD) begin
       ram_rd_cmd_count++;
@@ -162,13 +224,19 @@ class dma_scoreboard extends uvm_component;
 
   function void write_tlp(pcie_tlp_item o);
     int unsigned lim;
+
     if(o.kind==PCIE_MEM_WR_DONE) begin
       mark_c2h_commit(o);
+      return;
+    end
+    if(o.kind==PCIE_CPLD) begin
+      consume_completion(o);
       return;
     end
     if(o.kind==PCIE_MEM_RD) begin
       memrd_count++; lim=cfg_bytes(cfg_vif.max_read_request_size);
       if(o.byte_len>max_memrd_tlp_bytes) max_memrd_tlp_bytes=o.byte_len;
+      start_pcie_read(o);
     end else if(o.kind==PCIE_MEM_WR) begin
       memwr_count++; lim=cfg_bytes(cfg_vif.max_payload_size);
       if(o.byte_len>max_memwr_tlp_bytes) max_memwr_tlp_bytes=o.byte_len;
@@ -187,11 +255,13 @@ class dma_scoreboard extends uvm_component;
   function void check_phase(uvm_phase phase);
     if(pending.num()!=0)
       `uvm_error("SB",$sformatf("%0d descriptors still pending",pending.num()))
+    if(pcie_reads.num()!=0)
+      `uvm_error("SB_TAG",$sformatf("%0d PCIe read tags still active",pcie_reads.num()))
   endfunction
 
   function void report_phase(uvm_phase phase);
-    `uvm_info("SB",$sformatf("checks=%0d errors=%0d memrd=%0d memwr=%0d max_h2c_outstanding=%0d max_memrd_tlp=%0d max_memwr_tlp=%0d ram_rd_cmds=%0d ram_wr_cmds=%0d ram_wr_bytes=%0d",
-      checks,errors,memrd_count,memwr_count,max_h2c_outstanding,max_memrd_tlp_bytes,max_memwr_tlp_bytes,
-      ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count),UVM_LOW)
+    `uvm_info("SB",$sformatf("checks=%0d errors=%0d memrd=%0d memwr=%0d cpld=%0d max_pcie_outstanding=%0d split_reads=%0d max_h2c_desc=%0d max_memrd_tlp=%0d max_memwr_tlp=%0d ram_rd_cmds=%0d ram_wr_cmds=%0d ram_wr_bytes=%0d",
+      checks,errors,memrd_count,memwr_count,cpld_count,max_pcie_outstanding,split_read_requests,max_h2c_outstanding,
+      max_memrd_tlp_bytes,max_memwr_tlp_bytes,ram_rd_cmd_count,ram_wr_cmd_count,ram_wr_byte_count),UVM_LOW)
   endfunction
 endclass

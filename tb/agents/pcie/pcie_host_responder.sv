@@ -1,6 +1,7 @@
 class pcie_pending_cpl extends uvm_object;
   `uvm_object_utils(pcie_pending_cpl)
   bit [127:0] hdr; bit [255:0] data; bit [9:0] tag; int due_cycle;
+  pcie_tlp_item obs;
   function new(string name="pcie_pending_cpl"); super.new(name); endfunction
 endclass
 
@@ -20,6 +21,7 @@ class pcie_host_responder extends uvm_component;
   int unsigned tx_rd_stall_cycles;
   int unsigned tx_wr_stall_cycles;
   int unsigned cpl_stall_cycles;
+  pcie_tlp_item active_cpl_obs;
   bit wr_active;
   longint unsigned wr_addr;
   int unsigned wr_dw_len,wr_dw_seen,wr_byte_len;
@@ -66,7 +68,7 @@ class pcie_host_responder extends uvm_component;
       cpl.kind=PCIE_CPLD; cpl.requester_id=req.requester_id; cpl.completer_id=cfg.completer_id; cpl.tag=req.tag;
       cpl.addr=a; cpl.byte_len=chunk; cpl.byte_count=remain; cpl.lower_addr=a[6:0]; cpl.cpl_status=3'b000;
       cpl.data='0; for(int i=0;i<chunk;i++) cpl.data[(off+i)*8 +:8]=mem.host_get(a+i);
-      p.hdr=cpl.build_cpld_header(); p.data=cpl.data; p.tag=req.tag;
+      p.hdr=cpl.build_cpld_header(); p.data=cpl.data; p.tag=req.tag; p.obs=cpl;
       p.due_cycle=cycle+$urandom_range(cfg.cpl_max_latency,cfg.cpl_min_latency);
       pending.push_back(p); chunks++;
       if(unique_pending_tags()>max_unique_pending_tags) max_unique_pending_tags=unique_pending_tags();
@@ -123,9 +125,19 @@ class pcie_host_responder extends uvm_component;
         cpl_release_armed=(cfg.hold_cpl_until_unique_tags==0);
         forced_ooo_done=0;
         max_unique_pending_tags=0;
+        active_cpl_obs=null;
         continue;
       end
-      if(vif.rx_cpl_valid && !vif.host_cb.rx_cpl_ready) begin cpl_stall_cycles++; continue; end
+      if(vif.rx_cpl_valid && !vif.host_cb.rx_cpl_ready) begin
+        cpl_stall_cycles++;
+        continue;
+      end
+      if(vif.rx_cpl_valid && vif.host_cb.rx_cpl_ready && active_cpl_obs!=null) begin
+        // Publish CplD only on the actual valid/ready handshake.  The
+        // scoreboard can therefore maintain a real PCIe-tag outstanding table.
+        ap.write(active_cpl_obs);
+        active_cpl_obs=null;
+      end
       vif.host_cb.rx_cpl_valid<=0;
       idx=-1;
       if(!cpl_release_armed && cfg.hold_cpl_until_unique_tags!=0) continue;
@@ -148,7 +160,7 @@ class pcie_host_responder extends uvm_component;
 
       if(idx>=0) begin
         if(idx>0 && pending[idx].tag!=pending[0].tag) cross_tag_ooo_count++;
-        p=pending[idx]; pending.delete(idx);
+        p=pending[idx]; pending.delete(idx); active_cpl_obs=p.obs;
         vif.host_cb.rx_cpl_hdr<=p.hdr; vif.host_cb.rx_cpl_data<=p.data; vif.host_cb.rx_cpl_error<=0;
         vif.host_cb.rx_cpl_sop<=1; vif.host_cb.rx_cpl_eop<=1; vif.host_cb.rx_cpl_valid<=1;
       end
