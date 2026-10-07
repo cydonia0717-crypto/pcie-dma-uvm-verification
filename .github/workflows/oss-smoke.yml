@@ -65,6 +65,12 @@ jobs:
         run: |
           source .env.oss
           TEST=dma_random_stress_test SEED=47 bash scripts/run_verilator.sh
+      - name: Qualify regression evidence
+        run: |
+          python3 scripts/summarize_regression.py
+      - name: Merge coverage and report DUT scope
+        run: |
+          bash scripts/merge_coverage.sh
       - name: Reproduce discovered upstream max-length read bug
         run: |
           source .env.oss
@@ -77,6 +83,8 @@ jobs:
           path: |
             out/verilator/runs/**/run.log
             out/verilator/runs/**/coverage.dat
+            out/verilator/qualification/**
+            out/verilator/coverage/**
             out/verilator/repro_upstream_maxlen_bug/run.log
             out/verilator/repro-upstream-build/compile.log
             out/verilator/ci-build/compile.log
