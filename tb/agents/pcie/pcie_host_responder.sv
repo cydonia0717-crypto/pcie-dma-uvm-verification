@@ -15,6 +15,7 @@ class pcie_host_responder extends uvm_component;
   int cycle;
   bit cpl_release_armed;
   bit forced_ooo_done;
+  bit injected_ur;
   int unsigned max_unique_pending_tags;
   int unsigned split_memrd_count;
   int unsigned cross_tag_ooo_count;
@@ -57,6 +58,36 @@ class pcie_host_responder extends uvm_component;
     pcie_tlp_item req,cpl; pcie_pending_cpl p; longint unsigned a;
     int remain,chunk,off,chunks,one_beat_cap;
     req=pcie_tlp_item::type_id::create("rd_req"); req.decode_request(h); req.byte_len=bytes_from_req(h); req.addr=first_byte_addr(h); ap.write(req);
+
+    // Negative-path stimulus: return one well-formed Completion without Data
+    // with Unsupported Request status.  The DUT should terminate the read
+    // operation and propagate DMA_ERROR_PCIE_CPL_STATUS_UR (4'hA).
+    if(cfg.inject_ur_once && !injected_ur) begin
+      bit [127:0] eh;
+      p=pcie_pending_cpl::type_id::create("ur_pc");
+      cpl=pcie_tlp_item::type_id::create("ur_cpl");
+      cpl.kind=PCIE_CPLD; cpl.requester_id=req.requester_id;
+      cpl.completer_id=cfg.completer_id; cpl.tag=req.tag;
+      cpl.addr=req.addr; cpl.byte_len=0; cpl.byte_count=0;
+      cpl.lower_addr='0; cpl.cpl_status=3'b001; cpl.data='0;
+      eh='0;
+      eh[127:125]=3'b000;
+      eh[124:120]=5'b01010;
+      eh[95:80]=cfg.completer_id;
+      eh[79:77]=3'b001;
+      eh[63:48]=req.requester_id;
+      eh[47:40]=req.tag[7:0];
+      p.hdr=eh; p.data='0; p.tag=req.tag; p.obs=cpl;
+      p.due_cycle=cycle+$urandom_range(cfg.cpl_max_latency,cfg.cpl_min_latency);
+      pending.push_back(p);
+      injected_ur=1;
+      if(unique_pending_tags()>max_unique_pending_tags) max_unique_pending_tags=unique_pending_tags();
+      if(!cpl_release_armed && cfg.hold_cpl_until_unique_tags!=0 &&
+         unique_pending_tags()>=cfg.hold_cpl_until_unique_tags)
+        cpl_release_armed=1;
+      return;
+    end
+
     a=req.addr; remain=req.byte_len; chunks=0;
     while(remain>0) begin
       off=a[1:0];
@@ -124,6 +155,7 @@ class pcie_host_responder extends uvm_component;
         vif.host_cb.rx_cpl_valid<=0;
         cpl_release_armed=(cfg.hold_cpl_until_unique_tags==0);
         forced_ooo_done=0;
+        injected_ur=0;
         max_unique_pending_tags=0;
         active_cpl_obs=null;
         continue;
