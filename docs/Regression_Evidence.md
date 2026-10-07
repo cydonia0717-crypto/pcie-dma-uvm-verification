@@ -5,27 +5,26 @@ This file records the last fully qualified public baseline used by the resume nu
 ## Baseline
 
 - GitHub Actions workflow: `oss-smoke`
-- run: **#74**
-- head: `7711efd2ff809e96e013a36ced4b88266b3a8827`
+- run: **#89**
+- head: `8c5110e5b186acfad7a8be1da0a690f47a70ca1a`
 - conclusion: **success**
-- artifact: `pcie-dma-regression-74`
-- artifact digest: `sha256:dd714b7dc665dbc1ad363c93f2bcd91d6bb44651345a2bf402812723f829cf55`
+- artifact: `pcie-dma-regression-89`
 
 The qualification archived each UVM run log, each Verilator coverage database, the merged coverage database, machine-readable regression summary, and the pristine-upstream bug reproducer.
 
 ## Normal-regression totals
 
-- clean simulation runs: **13**
-- completed descriptor end-to-end checks: **256**
-- Memory Read TLPs: **2,704**
-- Memory Write TLPs: **1,109**
-- Completion-with-Data packets: **41,390**
+- clean simulation runs: **14**
+- completed descriptor end-to-end checks: **258**
+- Memory Read TLPs: **2,705**
+- Memory Write TLPs: **1,110**
+- Completion-with-Data packets: **41,391**
 - read requests completed through multiple CplD packets: **2,674**
 - peak simultaneous PCIe Memory Read tags: **16**
 - peak simultaneous DMA descriptors: **11**
 - largest observed MemRd: **512 B**
 - largest observed MemWr: **256 B**
-- H2C Device-RAM bytes written: **1,314,177 B**
+- H2C Device-RAM bytes written: **1,322,015 B**
 - UVM errors/fatals: **0 / 0 in every normal run**
 
 ## Directed proof points
@@ -86,16 +85,20 @@ The large-transfer run completes exactly **1 MiB H2C** via **17 descriptors** an
 
 ### Random stress
 
-Three reproducible seeds (11, 29, 47) complete 64 mixed descriptors each.  Peak descriptor concurrency reaches **11** and every seed reaches **16 active PCIe read tags** while exercising cross-tag reordering.
+Three reproducible seeds (11, 29, 47) complete 64 mixed descriptors each.
+
+### Zero-length source-defined behavior
+
+Both H2C and C2H zero-length descriptors are checked.  The qualification requires descriptor retirement while preserving destination sentinels; the H2C path observes the source-defined zero-length Memory Read / Completion handshake without writing payload bytes.  Peak descriptor concurrency reaches **11** and every seed reaches **16 active PCIe read tags** while exercising cross-tag reordering.
 
 ## Coverage evidence
 
 Merged public qualification:
 
-- reachable functional coverage: **31/31 = 100%**
-- raw covergroup: **31/33 = 93.9%**
+- reachable functional coverage: **48/48 = 100%**
+- raw covergroup: **48/50 = 96.0%**
 - DUT-scoped line coverage: **818/840 = 97.4%**
-- DUT-scoped branch coverage: **200/253 = 79.1%**
+- DUT-scoped branch coverage: **208/253 = 82.2%**
 
 The two raw covergroup bins excluded from the reachable denominator are semantic exclusions: an illegal single request crossing a 4 KiB boundary and an ignored Completion-status catch-all.
 
