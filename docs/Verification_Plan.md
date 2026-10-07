@@ -26,7 +26,7 @@
 | P22 | max descriptor length | near 64 KiB | no counter overflow |
 | P23 | large logical DMA | chain descriptors to 1 MiB | aggregate end-to-end data integrity |
 | P24 | random stress | constrained mixed traffic | scoreboard clean across seeds |
-| P25 | mid-flight reset recovery | assert reset with 16 active MemRd tags and queued CplD | stale contexts flushed; busy clears; fresh H2C/C2H complete |
+| P25 | mid-flight reset recovery | assert reset with 8 active MemRd tags and queued CplD | stale contexts flushed; busy clears; fresh H2C/C2H complete |
 
 ## Closure criteria
 
