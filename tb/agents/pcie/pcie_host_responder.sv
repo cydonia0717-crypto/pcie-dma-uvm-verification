@@ -51,10 +51,11 @@ class pcie_host_responder extends uvm_component;
 
   task capture_write_beat();
     int bytes,dw; longint unsigned base; bit[3:0] be;
+    pcie_tlp_item o;
     if(vif.host_cb.tx_wr_sop) begin
       wr_active=1; wr_addr=first_byte_addr(vif.host_cb.tx_wr_hdr); wr_dw_len=(vif.host_cb.tx_wr_hdr[105:96]==0)?1024:vif.host_cb.tx_wr_hdr[105:96]; wr_dw_seen=0;
       wr_first_be=vif.host_cb.tx_wr_hdr[67:64]; wr_last_be=vif.host_cb.tx_wr_hdr[71:68];
-      pcie_tlp_item o=pcie_tlp_item::type_id::create("wr_req"); o.decode_request(vif.host_cb.tx_wr_hdr); o.addr=wr_addr; o.byte_len=bytes_from_req(vif.host_cb.tx_wr_hdr); o.data=vif.host_cb.tx_wr_data; o.strb=vif.host_cb.tx_wr_strb; ap.write(o);
+      o=pcie_tlp_item::type_id::create("wr_req"); o.decode_request(vif.host_cb.tx_wr_hdr); o.addr=wr_addr; o.byte_len=bytes_from_req(vif.host_cb.tx_wr_hdr); o.data=vif.host_cb.tx_wr_data; o.strb=vif.host_cb.tx_wr_strb; ap.write(o);
     end
     if(wr_active) begin
       for(int d=0;d<8;d++) if(vif.host_cb.tx_wr_strb[d]) begin
