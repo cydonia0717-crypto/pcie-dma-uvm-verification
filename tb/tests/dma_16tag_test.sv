@@ -29,6 +29,16 @@ class dma_16tag_test extends dma_base_test;
     else
       `uvm_info("16TAG","scoreboard observed 16 simultaneous PCIe Memory Read tags",UVM_LOW)
 
+    if(env.sb.unique_pcie_tags_seen!=16)
+      `uvm_error("TAGREUSE",$sformatf("expected all 16 PCIe tag values to be exercised, observed %0d",
+        env.sb.unique_pcie_tags_seen))
+    if(env.sb.pcie_tag_reuse_count<16)
+      `uvm_error("TAGREUSE",$sformatf("expected repeated legal PCIe tag reuse after completion, observed %0d reuse events",
+        env.sb.pcie_tag_reuse_count))
+    else
+      `uvm_info("TAGREUSE",$sformatf("observed %0d legal PCIe tag reuse events after retirement",
+        env.sb.pcie_tag_reuse_count),UVM_LOW)
+
     phase.drop_objection(this);
   endtask
 endclass
