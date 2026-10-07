@@ -4,8 +4,10 @@ module tb_top;
   logic clk=0; always #5 clk=~clk;
   dma_desc_if desc_if(clk); pcie_tlp_if pcie_if(clk); dma_ram_if ram_if(clk); dma_cfg_if cfg_if(clk);
 
-  logic rst=1;
-  initial begin repeat(8) @(posedge clk); rst<=0; end
+  logic init_rst=1;
+  logic rst;
+  assign rst=init_rst | cfg_if.force_reset;
+  initial begin repeat(8) @(posedge clk); init_rst<=0; end
   assign desc_if.rst=rst; assign pcie_if.rst=rst; assign ram_if.rst=rst; assign cfg_if.rst=rst;
 
   initial begin
