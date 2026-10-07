@@ -20,7 +20,7 @@ class dma_random_stress_seq extends dma_base_seq;
         pa=64'h0000_a000_0000_0000 + i*64'h2000 + off;
         ra=20'h50000 + i*'h1000 + off;
       end
-      send(dir,pa,ra,len,bit'(8'h20+i));
+      send(dir,pa,ra,len,8'h20+i);
     end
   endtask
 endclass
