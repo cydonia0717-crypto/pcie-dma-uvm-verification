@@ -260,14 +260,15 @@ class dma_scoreboard extends uvm_component;
     if(o.requester_id!=c.requester_id) begin
       errors++; `uvm_error("SB_CPL",$sformatf("Requester ID mismatch tag=%0h exp=%h act=%h",o.tag,c.requester_id,o.requester_id))
     end
-    if(o.cpl_status!=0) begin
+    if(o.cpl_status!=0 || o.cpl_error!=0) begin
       if(completion_errors_seen < expected_completion_errors) begin
         completion_errors_seen++;
         pcie_reads.delete(o.tag);
         return;
       end
       errors++;
-      `uvm_error("SB_CPL",$sformatf("unexpected completion status tag=%0h status=%0h",o.tag,o.cpl_status))
+      `uvm_error("SB_CPL",$sformatf("unexpected completion error tag=%0h status=%0h rx_error=%0h",
+        o.tag,o.cpl_status,o.cpl_error))
     end
     if(o.byte_count!=c.remaining) begin
       errors++; `uvm_error("SB_CPL",$sformatf("Byte Count mismatch tag=%0h exp=%0d act=%0d",o.tag,c.remaining,o.byte_count))
