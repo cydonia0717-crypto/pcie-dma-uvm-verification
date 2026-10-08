@@ -13,6 +13,7 @@ class pcie_tlp_item extends uvm_sequence_item;
   bit [12:0] byte_count;
   bit [6:0] lower_addr;
   bit [2:0] cpl_status;
+  bit [3:0] cpl_error;
 
   `uvm_object_utils(pcie_tlp_item)
   function new(string name="pcie_tlp_item"); super.new(name); endfunction
