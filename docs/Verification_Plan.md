@@ -27,6 +27,7 @@
 | P23 | large logical DMA | chain descriptors to 1 MiB | aggregate end-to-end data integrity |
 | P24 | random stress | constrained mixed traffic | scoreboard clean across seeds |
 | P25 | mid-flight reset recovery | assert reset with an active MemRd and queued CplD | stale contexts flushed; busy clears; fresh H2C/C2H complete |
+| P26 | read/write enable gating | hold H2C/C2H descriptor valid with corresponding enable low, then re-enable | no handshake/TLP while disabled; descriptor completes after re-enable |
 
 ## Closure criteria
 
