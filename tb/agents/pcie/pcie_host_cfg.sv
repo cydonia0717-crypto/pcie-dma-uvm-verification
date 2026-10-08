@@ -9,6 +9,9 @@ class pcie_host_cfg extends uvm_object;
   bit enable_cross_tag_ooo=1;
   bit force_cross_tag_ooo_once=0;
   bit inject_ur_once=0;
+  // Directed fault kind: 0=normal, 1=UR, 2=CA, 3=Poisoned,
+  // 4=Timeout indication, 5=FLR indication.
+  int unsigned inject_error_kind=0;
   bit [15:0] completer_id=16'h0200;
   function new(string name="pcie_host_cfg"); super.new(name); endfunction
 endclass
