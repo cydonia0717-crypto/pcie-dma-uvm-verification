@@ -13,6 +13,7 @@ tests=(
   "dma_backpressure_test 7"
   "dma_max_len_test 8"
   "dma_completion_error_test 9"
+  "dma_completion_matrix_test 16"
   "dma_zero_len_test 12"
   "dma_reset_recovery_test 13"
   "dma_enable_gating_test 14"
