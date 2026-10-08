@@ -49,6 +49,7 @@ package dma_uvm_pkg;
   `include "tests/dma_max_len_test.sv"
   `include "tests/dma_completion_error_test.sv"
   `include "tests/dma_completion_matrix_test.sv"
+  `include "tests/dma_tx_quiescence_test.sv"
   `include "tests/dma_1m_chain_test.sv"
   `include "tests/dma_zero_len_test.sv"
   `include "tests/dma_reset_recovery_test.sv"
