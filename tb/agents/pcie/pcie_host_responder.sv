@@ -1,6 +1,7 @@
 class pcie_pending_cpl extends uvm_object;
   `uvm_object_utils(pcie_pending_cpl)
   bit [127:0] hdr; bit [255:0] data; bit [255:0] data_beats[$];
+  bit [3:0] error;
   bit [9:0] tag; int due_cycle;
   pcie_tlp_item obs;
   function new(string name="pcie_pending_cpl"); super.new(name); endfunction
@@ -16,7 +17,7 @@ class pcie_host_responder extends uvm_component;
   int cycle;
   bit cpl_release_armed;
   bit forced_ooo_done;
-  bit injected_ur;
+  bit injected_error;
   int unsigned max_unique_pending_tags;
   int unsigned split_memrd_count;
   int unsigned cross_tag_ooo_count;
@@ -65,28 +66,49 @@ class pcie_host_responder extends uvm_component;
     int remain,chunk,off,chunks;
     req=pcie_tlp_item::type_id::create("rd_req"); req.decode_request(h); req.byte_len=bytes_from_req(h); req.addr=first_byte_addr(h); ap.write(req);
 
-    // Negative-path stimulus: return one well-formed Completion without Data
-    // with Unsupported Request status.  The DUT should terminate the read
-    // operation and propagate DMA_ERROR_PCIE_CPL_STATUS_UR (4'hA).
-    if(cfg.inject_ur_once && !injected_ur) begin
+    // Negative-path stimulus.  UR keeps the legacy shorthand; the
+    // generic path can inject either a non-success Completion Status (UR/CA)
+    // or an interface error code on an otherwise well-formed CplD
+    // (Poisoned/Timeout/FLR).  This prevents a format error from masking the
+    // terminating-error branch we intend to verify.
+    if((cfg.inject_ur_once || cfg.inject_error_once) && !injected_error) begin
       bit [127:0] eh;
-      p=pcie_pending_cpl::type_id::create("ur_pc");
-      cpl=pcie_tlp_item::type_id::create("ur_cpl");
+      bit [2:0] err_status;
+      bit [3:0] err_rx;
+      err_status=cfg.inject_ur_once ? 3'b001 : cfg.inject_cpl_status;
+      err_rx=cfg.inject_ur_once ? 4'd0 : cfg.inject_rx_error;
+
+      p=pcie_pending_cpl::type_id::create("err_pc");
+      cpl=pcie_tlp_item::type_id::create("err_cpl");
       cpl.kind=PCIE_CPLD; cpl.requester_id=req.requester_id;
       cpl.completer_id=cfg.completer_id; cpl.tag=req.tag;
-      cpl.addr=req.addr; cpl.byte_len=0; cpl.byte_count=0;
-      cpl.lower_addr='0; cpl.cpl_status=3'b001; cpl.data='0;
-      eh='0;
-      eh[127:125]=3'b000;
-      eh[124:120]=5'b01010;
-      eh[95:80]=cfg.completer_id;
-      eh[79:77]=3'b001;
-      eh[63:48]=req.requester_id;
-      eh[47:40]=req.tag[7:0];
-      p.hdr=eh; p.data='0; p.data_beats.push_back('0); p.tag=req.tag; p.obs=cpl;
+      cpl.addr=req.addr; cpl.cpl_status=err_status; cpl.cpl_error=err_rx; cpl.data='0;
+      p.error=err_rx;
+
+      if(err_status!=3'b000) begin
+        // Non-success status is a Completion without Data.
+        cpl.byte_len=0; cpl.byte_count=0; cpl.lower_addr='0;
+        eh='0;
+        eh[127:125]=3'b000;
+        eh[124:120]=5'b01010;
+        eh[95:80]=cfg.completer_id;
+        eh[79:77]=err_status;
+        eh[63:48]=req.requester_id;
+        eh[47:40]=req.tag[7:0];
+        p.hdr=eh;
+      end else begin
+        // Poisoned/Timeout/FLR must remain a legal Completion-with-Data format
+        // so the DUT reaches the rx_cpl_error terminating-error decode.
+        cpl.byte_len=4;
+        cpl.byte_count=req.byte_len;
+        cpl.lower_addr=req.addr[6:0];
+        p.hdr=cpl.build_cpld_header();
+      end
+
+      p.data='0; p.data_beats.push_back('0); p.tag=req.tag; p.obs=cpl;
       p.due_cycle=cycle+$urandom_range(cfg.cpl_max_latency,cfg.cpl_min_latency);
       pending.push_back(p);
-      injected_ur=1;
+      injected_error=1;
       if(unique_pending_tags()>max_unique_pending_tags) max_unique_pending_tags=unique_pending_tags();
       if(!cpl_release_armed && cfg.hold_cpl_until_unique_tags!=0 &&
          unique_pending_tags()>=cfg.hold_cpl_until_unique_tags)
@@ -221,7 +243,7 @@ class pcie_host_responder extends uvm_component;
         active_cpl_beat=0;
         cpl_release_armed=(cfg.hold_cpl_until_unique_tags==0);
         forced_ooo_done=0;
-        injected_ur=0;
+        injected_error=0;
         max_unique_pending_tags=0;
         wr_active=0;
         wr_addr='0;
@@ -244,7 +266,7 @@ class pcie_host_responder extends uvm_component;
           active_cpl_beat++;
           vif.host_cb.rx_cpl_hdr<=active_cpl.hdr;
           vif.host_cb.rx_cpl_data<=active_cpl.data_beats[active_cpl_beat];
-          vif.host_cb.rx_cpl_error<=0;
+          vif.host_cb.rx_cpl_error<=active_cpl.error;
           vif.host_cb.rx_cpl_sop<=0;
           vif.host_cb.rx_cpl_eop<=(active_cpl_beat==active_cpl.data_beats.size()-1);
           vif.host_cb.rx_cpl_valid<=1;
@@ -257,6 +279,7 @@ class pcie_host_responder extends uvm_component;
       end
 
       vif.host_cb.rx_cpl_valid<=0;
+      vif.host_cb.rx_cpl_error<=0;
       vif.host_cb.rx_cpl_sop<=0;
       vif.host_cb.rx_cpl_eop<=0;
       idx=-1;
@@ -285,7 +308,7 @@ class pcie_host_responder extends uvm_component;
         active_cpl_beat=0;
         vif.host_cb.rx_cpl_hdr<=p.hdr;
         vif.host_cb.rx_cpl_data<=p.data_beats[0];
-        vif.host_cb.rx_cpl_error<=0;
+        vif.host_cb.rx_cpl_error<=p.error;
         vif.host_cb.rx_cpl_sop<=1;
         vif.host_cb.rx_cpl_eop<=(p.data_beats.size()==1);
         vif.host_cb.rx_cpl_valid<=1;
@@ -302,6 +325,8 @@ class pcie_host_responder extends uvm_component;
           if(vif.host_cb.rst) begin
             vif.host_cb.tx_rd_ready<=0; vif.host_cb.tx_wr_ready<=0;
           end else begin
+            if(!cfg.inject_ur_once && !cfg.inject_error_once)
+              injected_error=0;
             vif.host_cb.tx_rd_ready<=($urandom_range(99)>=cfg.rd_ready_stall_pct);
             vif.host_cb.tx_wr_ready<=($urandom_range(99)>=cfg.wr_ready_stall_pct);
             if(vif.host_cb.tx_rd_valid&&!vif.tx_rd_ready) tx_rd_stall_cycles++;
