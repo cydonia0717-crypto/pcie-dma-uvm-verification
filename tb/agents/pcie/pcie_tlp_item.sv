@@ -13,6 +13,10 @@ class pcie_tlp_item extends uvm_sequence_item;
   bit [12:0] byte_count;
   bit [6:0] lower_addr;
   bit [2:0] cpl_status;
+  // Error indications with Completion Status=SC must retire the read context,
+  // not be interpreted by the scoreboard as successful payload transfer.
+  bit terminal_error;
+  bit [3:0] rx_cpl_error;
 
   `uvm_object_utils(pcie_tlp_item)
   function new(string name="pcie_tlp_item"); super.new(name); endfunction

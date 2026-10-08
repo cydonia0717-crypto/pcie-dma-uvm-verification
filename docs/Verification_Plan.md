@@ -29,6 +29,7 @@
 | P25 | mid-flight reset recovery | assert reset with an active MemRd and queued CplD | stale contexts flushed; busy clears; fresh H2C/C2H complete |
 | P26 | read/write enable gating | hold H2C/C2H descriptor valid with corresponding enable low, then re-enable | no handshake/TLP while disabled; descriptor completes after re-enable |
 | P27 | multi-beat Completion TLP | return 64 B CplD over two 256-bit beats with mid-packet backpressure | SOP/EOP sequencing stable; one semantic CplD consumed after EOP; H2C data reassembles correctly |
+| P28 | Completion fault matrix / read recovery | inject CA/Poisoned Completion and generic RX sideband Timeout/FLR, then a clean H2C | DMA status maps to 0xB/0x9/0x1/0x8, tags retire, recovery traffic completes |
 
 ## Closure criteria
 

@@ -11,6 +11,7 @@ class dma_coverage extends uvm_component;
   int unsigned tlp_len_s;
   bit cross4k_s;
   bit [2:0] cpl_status_s;
+  bit [3:0] cpl_outcome_s;
 
   // Stateful coverage complements packet-field coverage.  It is derived only
   // from monitor observations, not from test intent, so these bins prove that
@@ -62,7 +63,16 @@ class dma_coverage extends uvm_component;
     cp_cpl_status: coverpoint cpl_status_s iff(kind_s==PCIE_CPLD) {
       bins successful={3'b000};
       bins unsupported_request={3'b001};
+      bins completer_abort={3'b100};
       ignore_bins other=default;
+    }
+    cp_cpl_outcome: coverpoint cpl_outcome_s iff(kind_s==PCIE_CPLD) {
+      bins success={0};
+      bins ur={1};
+      bins ca={4};
+      bins flr={8};
+      bins poisoned={9};
+      bins timeout={15};
     }
     cp_cpl_bus_span: coverpoint (tlp_len_s>32) iff(kind_s==PCIE_CPLD) {
       bins one_beat={0};
@@ -187,6 +197,11 @@ class dma_coverage extends uvm_component;
       tlp_len_s=o.byte_len;
       cross4k_s=(((o.addr&'hfff)+o.byte_len)>4096);
       cpl_status_s=o.cpl_status;
+      cpl_outcome_s=(o.cpl_status==3'b001)?4'd1:
+                    (o.cpl_status==3'b100)?4'd4:
+                    (o.terminal_error?
+                       (o.rx_cpl_error == 4'd15 ? 4'd15 :
+                        (o.rx_cpl_error == 4'd8 ? 4'd8 : 4'd9)):4'd0);
       tlp_cg.sample();
     end
 

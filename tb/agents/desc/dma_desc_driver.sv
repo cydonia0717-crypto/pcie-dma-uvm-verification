@@ -16,7 +16,9 @@ class dma_desc_driver extends uvm_driver #(dma_desc_item);
         vif.drv_cb.rd_valid<=0;
         do @(vif.drv_cb); while(vif.drv_cb.rst);
         vif.drv_cb.rd_valid<=1;
-      end else if(vif.drv_cb.rd_ready) begin
+      end else if(vif.drv_cb.rd_ready && vif.rd_valid) begin
+        // Do not retire a sequence item on an old sampled READY before the
+        // clocking-block output VALID has actually reached the bus.
         break;
       end
     end
@@ -33,7 +35,8 @@ class dma_desc_driver extends uvm_driver #(dma_desc_item);
         vif.drv_cb.wr_valid<=0;
         do @(vif.drv_cb); while(vif.drv_cb.rst);
         vif.drv_cb.wr_valid<=1;
-      end else if(vif.drv_cb.wr_ready) begin
+      end else if(vif.drv_cb.wr_ready && vif.wr_valid) begin
+        // A sampled READY alone is not proof of a valid/ready handshake.
         break;
       end
     end
