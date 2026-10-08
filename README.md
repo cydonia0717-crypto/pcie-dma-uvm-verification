@@ -38,32 +38,35 @@ Direction naming:
 
 - Descriptor Agent drives H2C/C2H descriptors and observes operation status.
 - PCIe Host Agent observes Memory Read/Write TLPs, owns a host-memory model,
-  injects backpressure, and generates split/out-of-order Completion traffic.
+  injects backpressure, and generates split/out-of-order/multi-beat Completion traffic.
 - Device RAM Agent models the segmented local RAM interface with independent
   read/write backpressure.
 - Reference/Scoreboard keeps independent host/device memory images, a live
   descriptor table, and a PCIe-tag Outstanding Request Table.
 - SVA checks ready/valid stability, MRRS/MPS limits, and 4 KiB request rules.
 - Functional coverage tracks direction, length, alignment, TLP class/size,
-  Completion status, outstanding depth, PCIe-tag reuse, and runtime reset.
+  Completion status/bus span, outstanding depth, PCIe-tag reuse, runtime reset,
+  and read/write enable gating.
 
 ## Qualification status
 
 Public GitHub Actions qualification is green.  The current evidence baseline is
-Run #110 (head 3a33ec3fbd2050a09fecebb7c22392101c91eb66).
+Run #133 (head a5f01ad61eeaa37a72466d70068f87271735fefc).
 
 Measured normal-regression results:
 
-- 15 clean simulation runs
-- 260 completed descriptor end-to-end checks
-- 2,708 Memory Read TLPs
-- 1,112 Memory Write TLPs
-- 41,399 Completion-with-Data packets
-- 2,675 read requests completed through multiple CplD packets
+- 17 clean simulation runs
+- 263 completed descriptor end-to-end checks
+- 2,726 Memory Read TLPs
+- 1,116 Memory Write TLPs
+- 41,479 Completion-with-Data packets
+- 2,693 read requests completed through multiple CplD packets
 - 16 simultaneous active PCIe Memory Read tags
 - 11 simultaneous DMA descriptors observed
 - all 16 PCIe tag values exercised, with 2,568 legal post-retirement reuse events
+- read/write enable gating verified with held descriptors and clean forward progress after re-enable
 - mid-flight reset recovery verified with live descriptor/read contexts and stale-CplD flush
+- 64 B Completion TLPs verified across 2 x 256-bit beats with observed input backpressure
 - 512 B largest Memory Read request / 256 B largest Memory Write request
 - 65,535 B single-descriptor boundary verified in both directions
 - 1 MiB logical H2C transfer verified through 17 chained descriptors
@@ -71,12 +74,12 @@ Measured normal-regression results:
 
 Coverage from the merged public qualification database:
 
-- reachable functional coverage: 51/51 = 100%
-- raw Verilator covergroup report: 51/53 = 96.2%
+- reachable functional coverage: 53/53 = 100%
+- raw Verilator covergroup report: 53/55 = 96.4%
 - the two raw uncovered bins are intentionally excluded semantic bins:
   an illegal 4 KiB-crossing request and an ignored Completion-status catch-all
-- DUT-scoped line coverage: 818/840 = 97.4%
-- DUT-scoped branch coverage: 208/253 = 82.2%
+- DUT-scoped line coverage: 820/840 = 97.6%
+- DUT-scoped branch coverage: 218/253 = 86.2%
 
 ## Real RTL issue found by this verification flow
 
