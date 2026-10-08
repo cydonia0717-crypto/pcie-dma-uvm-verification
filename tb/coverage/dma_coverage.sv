@@ -200,8 +200,8 @@ class dma_coverage extends uvm_component;
       cpl_outcome_s=(o.cpl_status==3'b001)?4'd1:
                     (o.cpl_status==3'b100)?4'd4:
                     (o.terminal_error?
-                       (o.rx_cpl_error==4'd15?4'd15:
-                        (o.rx_cpl_error==4'd8?4'd8:4'd9)):4'd0);
+                       (o.rx_cpl_error == 4'd15 ? 4'd15 :
+                        (o.rx_cpl_error == 4'd8 ? 4'd8 : 4'd9)):4'd0);
       tlp_cg.sample();
     end
 
