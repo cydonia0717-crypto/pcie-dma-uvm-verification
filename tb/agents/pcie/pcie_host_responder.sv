@@ -1,6 +1,7 @@
 class pcie_pending_cpl extends uvm_object;
   `uvm_object_utils(pcie_pending_cpl)
-  bit [127:0] hdr; bit [255:0] data; bit [9:0] tag; int due_cycle;
+  bit [127:0] hdr; bit [255:0] data; bit [255:0] data_beats[$];
+  bit [9:0] tag; int due_cycle;
   pcie_tlp_item obs;
   function new(string name="pcie_pending_cpl"); super.new(name); endfunction
 endclass
@@ -22,8 +23,12 @@ class pcie_host_responder extends uvm_component;
   int unsigned tx_rd_stall_cycles;
   int unsigned tx_wr_stall_cycles;
   int unsigned cpl_stall_cycles;
+  int unsigned multi_beat_cpl_count;
+  int unsigned max_cpl_beats;
+  int unsigned multi_beat_cpl_stall_cycles;
   int unsigned reset_dropped_completions;
-  pcie_tlp_item active_cpl_obs;
+  pcie_pending_cpl active_cpl;
+  int unsigned active_cpl_beat;
   bit wr_active;
   longint unsigned wr_addr;
   int unsigned wr_dw_len,wr_dw_seen,wr_byte_len;
@@ -57,7 +62,7 @@ class pcie_host_responder extends uvm_component;
 
   task enqueue_completions(bit[127:0] h);
     pcie_tlp_item req,cpl; pcie_pending_cpl p; longint unsigned a;
-    int remain,chunk,off,chunks,one_beat_cap;
+    int remain,chunk,off,chunks;
     req=pcie_tlp_item::type_id::create("rd_req"); req.decode_request(h); req.byte_len=bytes_from_req(h); req.addr=first_byte_addr(h); ap.write(req);
 
     // Negative-path stimulus: return one well-formed Completion without Data
@@ -78,7 +83,7 @@ class pcie_host_responder extends uvm_component;
       eh[79:77]=3'b001;
       eh[63:48]=req.requester_id;
       eh[47:40]=req.tag[7:0];
-      p.hdr=eh; p.data='0; p.tag=req.tag; p.obs=cpl;
+      p.hdr=eh; p.data='0; p.data_beats.push_back('0); p.tag=req.tag; p.obs=cpl;
       p.due_cycle=cycle+$urandom_range(cfg.cpl_max_latency,cfg.cpl_min_latency);
       pending.push_back(p);
       injected_ur=1;
@@ -112,6 +117,7 @@ class pcie_host_responder extends uvm_component;
       cpl.data[a[1:0]*8 +: 8]=mem.host_get(a);
       p.hdr=cpl.build_cpld_header();
       p.data=cpl.data;
+      p.data_beats.push_back(cpl.data);
       p.tag=req.tag;
       p.obs=cpl;
       p.due_cycle=cycle+$urandom_range(cfg.cpl_max_latency,cfg.cpl_min_latency);
@@ -125,18 +131,34 @@ class pcie_host_responder extends uvm_component;
     end
 
     while(remain>0) begin
+      int beat_count,lane,beat_idx,byte_idx;
       off=a[1:0];
-      // This host model emits one CplD beat per pending item.  Never advertise
-      // more payload than the 256-bit (32-byte) interface can carry in one beat.
-      one_beat_cap=(cfg.cpl_payload_max<32)?cfg.cpl_payload_max:32;
-      chunk=(remain < (one_beat_cap-off)) ? remain : (one_beat_cap-off);
+      // cpl_payload_max is the maximum byte span of one Completion TLP.  The
+      // default 32 B preserves the original one-beat behavior; values above
+      // 32 B intentionally create multi-beat CplD packets on the 256-bit bus.
+      chunk=(remain < (cfg.cpl_payload_max-off)) ? remain : (cfg.cpl_payload_max-off);
       p=pcie_pending_cpl::type_id::create("pc"); cpl=pcie_tlp_item::type_id::create("cpl");
       cpl.kind=PCIE_CPLD; cpl.requester_id=req.requester_id; cpl.completer_id=cfg.completer_id; cpl.tag=req.tag;
       cpl.addr=a; cpl.byte_len=chunk; cpl.byte_count=remain; cpl.lower_addr=a[6:0]; cpl.cpl_status=3'b000;
-      cpl.data='0; for(int i=0;i<chunk;i++) cpl.data[(off+i)*8 +:8]=mem.host_get(a+i);
-      p.hdr=cpl.build_cpld_header(); p.data=cpl.data; p.tag=req.tag; p.obs=cpl;
+      cpl.data='0;
+
+      beat_count=(off+chunk+31)/32;
+      for(int b=0;b<beat_count;b++) p.data_beats.push_back('0);
+      for(int i=0;i<chunk;i++) begin
+        lane=off+i;
+        beat_idx=lane/32;
+        byte_idx=lane%32;
+        p.data_beats[beat_idx][byte_idx*8 +:8]=mem.host_get(a+i);
+      end
+      p.data=p.data_beats[0];
+      cpl.data=p.data;
+      p.hdr=cpl.build_cpld_header(); p.tag=req.tag; p.obs=cpl;
       p.due_cycle=cycle+$urandom_range(cfg.cpl_max_latency,cfg.cpl_min_latency);
       pending.push_back(p); chunks++;
+      if(beat_count>1) begin
+        multi_beat_cpl_count++;
+        if(beat_count>max_cpl_beats) max_cpl_beats=beat_count;
+      end
       if(unique_pending_tags()>max_unique_pending_tags) max_unique_pending_tags=unique_pending_tags();
       if(!cpl_release_armed && cfg.hold_cpl_until_unique_tags!=0 &&
          unique_pending_tags()>=cfg.hold_cpl_until_unique_tags)
@@ -192,11 +214,15 @@ class pcie_host_responder extends uvm_component;
           reset_dropped_completions += pending.size();
           pending.delete();
         end
+        if(active_cpl!=null) begin
+          reset_dropped_completions++;
+          active_cpl=null;
+        end
+        active_cpl_beat=0;
         cpl_release_armed=(cfg.hold_cpl_until_unique_tags==0);
         forced_ooo_done=0;
         injected_ur=0;
         max_unique_pending_tags=0;
-        active_cpl_obs=null;
         wr_active=0;
         wr_addr='0;
         wr_dw_len=0;
@@ -206,15 +232,33 @@ class pcie_host_responder extends uvm_component;
       end
       if(vif.rx_cpl_valid && !vif.host_cb.rx_cpl_ready) begin
         cpl_stall_cycles++;
+        if(active_cpl!=null && active_cpl.data_beats.size()>1)
+          multi_beat_cpl_stall_cycles++;
         continue;
       end
-      if(vif.rx_cpl_valid && vif.host_cb.rx_cpl_ready && active_cpl_obs!=null) begin
-        // Publish CplD only on the actual valid/ready handshake.  The
-        // scoreboard can therefore maintain a real PCIe-tag outstanding table.
-        ap.write(active_cpl_obs);
-        active_cpl_obs=null;
+      if(vif.rx_cpl_valid && vif.host_cb.rx_cpl_ready && active_cpl!=null) begin
+        if(active_cpl_beat+1 < active_cpl.data_beats.size()) begin
+          // Advance within one Completion TLP.  Keep the semantic CplD private
+          // until EOP handshakes so the scoreboard consumes one transaction,
+          // not one item per interface beat.
+          active_cpl_beat++;
+          vif.host_cb.rx_cpl_hdr<=active_cpl.hdr;
+          vif.host_cb.rx_cpl_data<=active_cpl.data_beats[active_cpl_beat];
+          vif.host_cb.rx_cpl_error<=0;
+          vif.host_cb.rx_cpl_sop<=0;
+          vif.host_cb.rx_cpl_eop<=(active_cpl_beat==active_cpl.data_beats.size()-1);
+          vif.host_cb.rx_cpl_valid<=1;
+          continue;
+        end else begin
+          ap.write(active_cpl.obs);
+          active_cpl=null;
+          active_cpl_beat=0;
+        end
       end
+
       vif.host_cb.rx_cpl_valid<=0;
+      vif.host_cb.rx_cpl_sop<=0;
+      vif.host_cb.rx_cpl_eop<=0;
       idx=-1;
       if(!cpl_release_armed && cfg.hold_cpl_until_unique_tags!=0) continue;
 
@@ -236,9 +280,15 @@ class pcie_host_responder extends uvm_component;
 
       if(idx>=0) begin
         if(idx>0 && pending[idx].tag!=pending[0].tag) cross_tag_ooo_count++;
-        p=pending[idx]; pending.delete(idx); active_cpl_obs=p.obs;
-        vif.host_cb.rx_cpl_hdr<=p.hdr; vif.host_cb.rx_cpl_data<=p.data; vif.host_cb.rx_cpl_error<=0;
-        vif.host_cb.rx_cpl_sop<=1; vif.host_cb.rx_cpl_eop<=1; vif.host_cb.rx_cpl_valid<=1;
+        p=pending[idx]; pending.delete(idx);
+        active_cpl=p;
+        active_cpl_beat=0;
+        vif.host_cb.rx_cpl_hdr<=p.hdr;
+        vif.host_cb.rx_cpl_data<=p.data_beats[0];
+        vif.host_cb.rx_cpl_error<=0;
+        vif.host_cb.rx_cpl_sop<=1;
+        vif.host_cb.rx_cpl_eop<=(p.data_beats.size()==1);
+        vif.host_cb.rx_cpl_valid<=1;
       end
     end
   endtask

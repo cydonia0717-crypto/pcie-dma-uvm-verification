@@ -44,6 +44,7 @@ for log in sorted(RUN_ROOT.glob("*/run.log")):
     d["saw_zero_len"] = "zero-length H2C/C2H completed with destination sentinels preserved" in text
     d["saw_reset_recovery"] = bool(re.search(r"mid-flight reset flushed \d+ descriptors/\d+ PCIe reads, dropped \d+ stale CplD, and post-reset H2C/C2H completed cleanly", text))
     d["saw_enable_gating"] = "read/write enable gating held descriptors while disabled and recovered cleanly" in text
+    d["saw_multibeat_cpl"] = bool(re.search(r"multibeat_cpl=\d+ max_beats=[2-9]\d* stalled_cycles=[1-9]\d* split_reads=[1-9]\d*", text))
     runs.append(d)
 
 if not runs:
@@ -77,6 +78,7 @@ totals = {
     "saw_zero_len": any(r["saw_zero_len"] for r in runs),
     "saw_reset_recovery": any(r["saw_reset_recovery"] for r in runs),
     "saw_enable_gating": any(r["saw_enable_gating"] for r in runs),
+    "saw_multibeat_cpl": any(r["saw_multibeat_cpl"] for r in runs),
 }
 
 requirements = {
@@ -90,6 +92,7 @@ requirements = {
     "zero_length_semantics": totals["saw_zero_len"],
     "midflight_reset_recovery": totals["saw_reset_recovery"],
     "read_write_enable_gating": totals["saw_enable_gating"],
+    "multibeat_completion_with_backpressure": totals["saw_multibeat_cpl"],
     "mrrs_512_observed": totals["max_memrd_tlp"] == 512,
     "mps_256_observed": totals["max_memwr_tlp"] == 256,
 }

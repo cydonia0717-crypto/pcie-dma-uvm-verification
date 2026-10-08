@@ -64,6 +64,10 @@ class dma_coverage extends uvm_component;
       bins unsupported_request={3'b001};
       ignore_bins other=default;
     }
+    cp_cpl_bus_span: coverpoint (tlp_len_s>32) iff(kind_s==PCIE_CPLD) {
+      bins one_beat={0};
+      bins multi_beat={1};
+    }
   endgroup
 
   covergroup desc_state_cg;
