@@ -14,6 +14,7 @@ The canonical open-source qualification is defined in `scripts/oss_regression.sh
 | `dma_max_len_test` | 8 | 65,535-byte H2C/C2H single-descriptor boundary |
 | `dma_completion_error_test` | 9 | Unsupported Request Completion -> DMA descriptor error propagation |
 | `dma_completion_matrix_test` | 16 | CA, Poisoned, Timeout/FLR generic interface error indications -> descriptor codes and post-fault H2C recovery |
+| `dma_tx_quiescence_test` | 17 | require TX-ack accounting to drain and both read/write busy flags to clear after H2C/C2H |
 | `dma_1m_chain_test` | 10 | 1 MiB logical H2C transfer through 17 chained descriptors |
 | `dma_random_stress_test` | 11 | mixed H2C/C2H concurrency, splitting, reorder and backpressure |
 | `dma_zero_len_test` | 12 | source-defined zero-length H2C/C2H semantics and no destination byte modification |

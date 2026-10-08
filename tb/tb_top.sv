@@ -6,6 +6,21 @@ module tb_top;
 
   logic init_rst=1;
   logic rst;
+
+  // Generic TLP link transmit acknowledgments.  Read requests are single
+  // beat; writes can span beats, so report one TX completion at accepted EOP.
+  // Even when TX_SEQ_NUM_ENABLE=0, the pinned DUT uses these valid strobes to
+  // retire active_tx_count and update status_busy.
+  logic rd_tx_ack_valid=0,wr_tx_ack_valid=0;
+  always @(posedge clk) begin
+    if(rst) begin
+      rd_tx_ack_valid<=0;
+      wr_tx_ack_valid<=0;
+    end else begin
+      rd_tx_ack_valid<=pcie_if.tx_rd_valid && pcie_if.tx_rd_ready;
+      wr_tx_ack_valid<=pcie_if.tx_wr_valid && pcie_if.tx_wr_ready && pcie_if.tx_wr_eop;
+    end
+  end
   assign rst=init_rst | cfg_if.force_reset;
   initial begin repeat(8) @(posedge clk); init_rst<=0; end
   assign desc_if.rst=rst; assign pcie_if.rst=rst; assign ram_if.rst=rst; assign cfg_if.rst=rst;
@@ -28,7 +43,7 @@ module tb_top;
     .rx_cpl_tlp_data(pcie_if.rx_cpl_data),.rx_cpl_tlp_hdr(pcie_if.rx_cpl_hdr),.rx_cpl_tlp_error(pcie_if.rx_cpl_error),.rx_cpl_tlp_valid(pcie_if.rx_cpl_valid),.rx_cpl_tlp_sop(pcie_if.rx_cpl_sop),.rx_cpl_tlp_eop(pcie_if.rx_cpl_eop),.rx_cpl_tlp_ready(pcie_if.rx_cpl_ready),
     .tx_rd_req_tlp_hdr(pcie_if.tx_rd_hdr),.tx_rd_req_tlp_seq(),.tx_rd_req_tlp_valid(pcie_if.tx_rd_valid),.tx_rd_req_tlp_sop(pcie_if.tx_rd_sop),.tx_rd_req_tlp_eop(pcie_if.tx_rd_eop),.tx_rd_req_tlp_ready(pcie_if.tx_rd_ready),
     .tx_wr_req_tlp_data(pcie_if.tx_wr_data),.tx_wr_req_tlp_strb(pcie_if.tx_wr_strb),.tx_wr_req_tlp_hdr(pcie_if.tx_wr_hdr),.tx_wr_req_tlp_seq(),.tx_wr_req_tlp_valid(pcie_if.tx_wr_valid),.tx_wr_req_tlp_sop(pcie_if.tx_wr_sop),.tx_wr_req_tlp_eop(pcie_if.tx_wr_eop),.tx_wr_req_tlp_ready(pcie_if.tx_wr_ready),
-    .s_axis_rd_req_tx_seq_num('0),.s_axis_rd_req_tx_seq_num_valid('0),.s_axis_wr_req_tx_seq_num('0),.s_axis_wr_req_tx_seq_num_valid('0),
+    .s_axis_rd_req_tx_seq_num('0),.s_axis_rd_req_tx_seq_num_valid(rd_tx_ack_valid),.s_axis_wr_req_tx_seq_num('0),.s_axis_wr_req_tx_seq_num_valid(wr_tx_ack_valid),
     .s_axis_read_desc_pcie_addr(desc_if.rd_pcie_addr),.s_axis_read_desc_ram_sel(desc_if.rd_ram_sel),.s_axis_read_desc_ram_addr(desc_if.rd_ram_addr),.s_axis_read_desc_len(desc_if.rd_len),.s_axis_read_desc_tag(desc_if.rd_tag),.s_axis_read_desc_valid(desc_if.rd_valid),.s_axis_read_desc_ready(desc_if.rd_ready),
     .m_axis_read_desc_status_tag(desc_if.rd_status_tag),.m_axis_read_desc_status_error(desc_if.rd_status_error),.m_axis_read_desc_status_valid(desc_if.rd_status_valid),
     .s_axis_write_desc_pcie_addr(desc_if.wr_pcie_addr),.s_axis_write_desc_ram_sel(desc_if.wr_ram_sel),.s_axis_write_desc_ram_addr(desc_if.wr_ram_addr),.s_axis_write_desc_imm('0),.s_axis_write_desc_imm_en(1'b0),.s_axis_write_desc_len(desc_if.wr_len),.s_axis_write_desc_tag(desc_if.wr_tag),.s_axis_write_desc_valid(desc_if.wr_valid),.s_axis_write_desc_ready(desc_if.wr_ready),
