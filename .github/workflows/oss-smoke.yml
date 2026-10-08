@@ -77,6 +77,10 @@ jobs:
         run: |
           source .env.oss
           TEST=dma_enable_gating_test SEED=14 bash scripts/run_verilator.sh
+      - name: Multi-beat Completion with backpressure
+        run: |
+          source .env.oss
+          TEST=dma_multibeat_cpl_test SEED=15 bash scripts/run_verilator.sh
       - name: 1MiB chained H2C
         run: |
           source .env.oss
