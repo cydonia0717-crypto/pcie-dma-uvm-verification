@@ -35,6 +35,9 @@ class dma_completion_matrix_test extends dma_base_test;
         4: expected_err=4'h1;  // Timeout
         5: expected_err=4'h8;  // FLR
       endcase
+      // Ensure the next descriptor starts after the preceding status edge
+      // and a visible valid-low interval on the descriptor interface.
+      repeat(5) @(posedge cfg_vif.clk);
       dt=8'he0+kind;
       pa=64'h0000_000b_0000_2000+(kind*64'h1000);
       env.mem.seed_host(pa,128);
@@ -46,6 +49,11 @@ class dma_completion_matrix_test extends dma_base_test;
       seq=dma_completion_matrix_seq::type_id::create($sformatf("fault_%0d",kind));
       seq.pa=pa; seq.ra=20'h40000+kind*20'h1000; seq.dt=dt;
       seq.start(env.desc.sqr);
+      repeat(3) @(posedge cfg_vif.clk);
+      `uvm_info("CPLMAT_TRACE",$sformatf(
+        "case=%0d tag=%02x accepted=%0d pending=%0d checks=%0d read_busy=%0b",
+        kind,dt,env.sb.pending.exists(env.sb.key(DMA_H2C,dt)),
+        env.sb.pending.num(),env.sb.checks,cfg_vif.status_rd_busy),UVM_LOW)
 
       deadline=0;
       while(env.sb.checks<(kind-1) && deadline<10000) begin
@@ -63,11 +71,17 @@ class dma_completion_matrix_test extends dma_base_test;
     // Prove the read engine can complete ordinary traffic after all faults.
     env.host.rsp.cfg.inject_error_kind=0;
     env.host.rsp.injected_ur=0;
+    repeat(5) @(posedge cfg_vif.clk);
     pa=64'h0000_000b_0000_9000;
     env.mem.seed_host(pa,128);
     seq=dma_completion_matrix_seq::type_id::create("post_error_h2c");
     seq.pa=pa; seq.ra=20'h49000; seq.dt=8'hef;
     seq.start(env.desc.sqr);
+    repeat(3) @(posedge cfg_vif.clk);
+    `uvm_info("CPLMAT_TRACE",$sformatf(
+      "clean tag=ef accepted=%0d pending=%0d checks=%0d read_busy=%0b",
+      env.sb.pending.exists(env.sb.key(DMA_H2C,8'hef)),
+      env.sb.pending.num(),env.sb.checks,cfg_vif.status_rd_busy),UVM_LOW)
     deadline=0;
     while(env.sb.checks<5 && deadline<10000) begin
       @(posedge cfg_vif.clk);
