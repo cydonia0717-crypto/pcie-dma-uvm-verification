@@ -16,6 +16,7 @@ tests=(
   "dma_zero_len_test 12"
   "dma_reset_recovery_test 13"
   "dma_enable_gating_test 14"
+  "dma_multibeat_cpl_test 15"
   "dma_1m_chain_test 10"
   "dma_random_stress_test 11"
   "dma_random_stress_test 29"
