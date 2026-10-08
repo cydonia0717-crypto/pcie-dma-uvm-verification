@@ -40,6 +40,7 @@ for log in sorted(RUN_ROOT.glob("*/run.log")):
     d["saw_ooo"] = bool(re.search(r"cross_tag_ooo=[1-9]\d*", text))
     d["saw_maxlen"] = "65535-byte H2C and C2H descriptors completed cleanly" in text
     d["saw_cpl_error"] = "Unsupported Request completion propagated as DMA error 0xA" in text
+    d["saw_cpl_matrix"] = "CA=0xB Poisoned=0x9 Timeout=0x1 FLR=0x8 and post-error H2C recovered cleanly" in text
     d["saw_1m_chain"] = "1MiB H2C logical DMA completed through 17 descriptors with 16 PCIe tags in flight" in text
     d["saw_zero_len"] = "zero-length H2C/C2H completed with destination sentinels preserved" in text
     d["saw_reset_recovery"] = bool(re.search(r"mid-flight reset flushed \d+ descriptors/\d+ PCIe reads, dropped \d+ stale CplD, and post-reset H2C/C2H completed cleanly", text))
@@ -74,6 +75,7 @@ totals = {
     "saw_ooo": any(r["saw_ooo"] for r in runs),
     "saw_maxlen": any(r["saw_maxlen"] for r in runs),
     "saw_cpl_error": any(r["saw_cpl_error"] for r in runs),
+    "saw_cpl_matrix": any(r["saw_cpl_matrix"] for r in runs),
     "saw_1m_chain": any(r["saw_1m_chain"] for r in runs),
     "saw_zero_len": any(r["saw_zero_len"] for r in runs),
     "saw_reset_recovery": any(r["saw_reset_recovery"] for r in runs),
@@ -88,6 +90,7 @@ requirements = {
     "cross_tag_ooo_observed": totals["saw_ooo"],
     "max_length_boundary_passed": totals["saw_maxlen"],
     "completion_error_propagation": totals["saw_cpl_error"],
+    "completion_error_matrix_and_recovery": totals["saw_cpl_matrix"],
     "one_mib_chained_h2c": totals["saw_1m_chain"],
     "zero_length_semantics": totals["saw_zero_len"],
     "midflight_reset_recovery": totals["saw_reset_recovery"],
