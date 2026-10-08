@@ -12,7 +12,7 @@ H2C 是 Host -> Device：Descriptor 进入 DUT，DUT 发 Memory Read TLP，Host 
 
 ## 3. 为什么 PCIe 侧不用完整 VIP？
 
-这个项目目标是验证 DMA transaction-layer control，而不是复刻完整商用 PCIe VIP。Host Agent 只实现 DUT 所需的受限协议子集：MemRd/MemWr/CplD、Tag、Length、First/Last BE、Byte Count、Lower Address、Completion Status 和 backpressure。这样验证重点仍然落在 DMA splitting、outstanding 和 reassembly。
+这个项目目标是验证 DMA transaction-layer control，而不是复刻完整商用 PCIe VIP。Host Agent 只实现 DUT 所需的受限协议子集：MemRd/MemWr/CplD、Tag、Length、First/Last BE、Byte Count、Lower Address、Completion Status、multi-beat packet 和 backpressure。这样验证重点仍然落在 DMA splitting、outstanding 和 reassembly。
 
 ## 4. DUT 的关键配置是什么？
 
@@ -88,7 +88,7 @@ Scoreboard 用 `{direction, descriptor_tag}` 管理 live operation，不按 FIFO
 
 ## 22. Backpressure 做了哪些层？
 
-PCIe request ready 可以随机拉低，Completion 侧会等待 DUT ready，Device RAM read/write 也可以独立 throttle。协议 SVA 检查 valid&&!ready 时 payload 稳定，Scoreboard检查最终没有 request loss、重复或数据破坏。
+PCIe request ready 可以随机拉低，Completion 侧会等待 DUT ready，Device RAM read/write 也可以独立 throttle。协议 SVA 检查 valid&&!ready 时 payload 稳定，Scoreboard检查最终没有 request loss、重复或数据破坏；另外有专门的 multi-beat CplD testcase，把下游缓冲压满后实际观察 Completion input stall。
 
 ## 23. Completion Error 怎么验证？
 
@@ -133,15 +133,15 @@ DUT 第一笔 Memory Read TLP 的 Length field 变成 0。PCIe 中 Length=0 表�
 
 ## 33. 当前覆盖率怎么解释？
 
-公开合并回归的 reachable functional coverage 是 51/51=100%。Raw covergroup 是 51/53=96.2%，少的两个分别是明确的 illegal 4KiB-cross request bin 和 ignore Completion-status catch-all，所以不放入 closure denominator。新增的 Tag lifecycle first-use/reuse 和 runtime-reset coverage 也都已命中。DUT scoped line coverage 97.4%，branch coverage 82.2%。
+公开合并回归的 reachable functional coverage 是 53/53=100%。Raw covergroup 是 53/55=96.4%，少的两个分别是明确的 illegal 4KiB-cross request bin 和 ignore Completion-status catch-all，所以不放入 closure denominator。Tag lifecycle、runtime reset 以及 single/multi-beat Completion bus-span coverage 都已命中。DUT scoped line coverage 97.6%，branch coverage 86.2%。
 
-## 34. 为什么 Branch Coverage 82.2% 还可以收敛？
+## 34. 为什么 Branch Coverage 86.2% 还不是 100%？
 
-这个 RTL 是参数化通用 DMA engine，固定 qualification 配置关闭了部分分支，例如不同 address format、扩展 tag/某些 flow-control/parameter-specific 路径。Branch Coverage 需要结合 feature scope 做 hole review，不能为了数字去改变项目配置。功能 closure 和协议关键路径已经由 vPlan、SVA、directed/random regression共同覆盖。
+我做过 hole review，而不是只看百分比。P27 的 multi-beat Completion 场景把 branch coverage 从 82.2% 提到 86.2%，新增命中的 10 个 branch 都集中在 read engine 的 multi-cycle Completion 状态机；剩余 hole 里有固定配置不可达路径，例如强制 4-DW request 后的 3-DW 分支、16-tag 配置下的 extended-tag FIFO，以及 IMM_ENABLE=0 的 immediate-write 路径，也还有 Completion negative-path 等后续可继续收敛的分支。不会为了数字去改变 DUT scope 或参数配置。
 
 ## 35. 正常 regression 有多少？
 
-当前公开 baseline 是 GitHub Actions Run #110，共 15 个 clean simulation runs，包括 smoke、4KiB、16-tag、small/unaligned、MRRS/MPS、split/OOO、backpressure、completion error、max length、zero-length、mid-flight reset recovery、1MiB chain 和 3 个 random seeds。总计完成 260 个 descriptor end-to-end checks，全部 0 UVM_ERROR / 0 UVM_FATAL。
+当前公开 baseline 是 GitHub Actions Run #133，共 17 个 clean simulation runs，包括 smoke、4KiB、16-tag、small/unaligned、MRRS/MPS、split/OOO、backpressure、completion error、max length、zero-length、mid-flight reset recovery、read/write enable gating、multi-beat Completion、1MiB chain 和 3 个 random seeds。总计完成 263 个 descriptor end-to-end checks，全部 0 UVM_ERROR / 0 UVM_FATAL。
 
 ## 36. 随机测试不是只跑一个 Seed 吗？
 
@@ -161,12 +161,21 @@ DUT 第一笔 Memory Read TLP 的 Length field 变成 0。PCIe 中 Length=0 表�
 
 ## 40. 你自己完成了哪些内容？
 
-独立搭建 Descriptor Agent、PCIe Host responder/monitor、Segmented RAM Model、Host/Device Reference Model、Scoreboard、PCIe Tag Outstanding tracking、SVA、Functional Coverage、directed/random sequences、runtime-reset recovery、GitHub Actions regression/coverage flow，以及最大长度 bug 的定位、local RTL fix 和 negative-control reproducer。开源 DMA RTL 本身不是自己设计的。
+独立搭建 Descriptor Agent、PCIe Host responder/monitor、Segmented RAM Model、Host/Device Reference Model、Scoreboard、PCIe Tag Outstanding tracking、SVA、Functional Coverage、directed/random sequences、enable gating、runtime-reset recovery、multi-beat Completion/backpressure、GitHub Actions regression/coverage flow，以及最大长度 bug 的定位、local RTL fix 和 negative-control reproducer。开源 DMA RTL 本身不是自己设计的。
 
 ## 41. PCIe Tag 的释放和重复使用怎么验证？
 
-Scoreboard 除了维护 active Tag table、禁止 Tag 在尚未完成时提前复用，还单独记录每个 Tag 的生命周期。16-tag directed test 先证明 16 个 Tag 同时占满，随后 Completion 退休后继续发后续 request，Run #110 在这个用例里观察到 **48 次合法 Tag reuse**；整个 15-run qualification 累计观察到 **2,568 次**，对应 coverage 里 first-use/reuse 两个 bin 都命中。
+Scoreboard 除了维护 active Tag table、禁止 Tag 在尚未完成时提前复用，还单独记录每个 Tag 的生命周期。16-tag directed test 先证明 16 个 Tag 同时占满，随后 Completion 退休后继续发后续 request，Run #133 在这个用例里观察到 **48 次合法 Tag reuse**；整个 17-run qualification 累计观察到 **2,568 次**，对应 coverage 里 first-use/reuse 两个 bin 都命中。
 
 ## 42. Mid-flight Reset Recovery 怎么验证？
 
-这个测试不和 16-tag capacity pressure 绑在一起，而是先让一个真实 H2C descriptor 产生未完成 PCIe read，再扣住 Completion 后打运行时 reset。Run #110 实测 reset 时 Scoreboard flush 了 **1 个 Descriptor 和 2 个 PCIe Read context**，Host responder 丢弃了 **16 个 stale CplD**；reset 后再发新的 H2C/C2H，两边都正常完成，DUT busy 也恢复为 0。这样同时验证了旧事务不会跨 reset 泄漏，以及 reset 后资源能重新初始化并继续前进。
+这个测试不和 16-tag capacity pressure 绑在一起，而是先让一个真实 H2C descriptor 产生未完成 PCIe read，再扣住 Completion 后打运行时 reset。Run #133 实测 reset 时 Scoreboard flush 了 **1 个 Descriptor 和 2 个 PCIe Read context**，Host responder 丢弃了 **16 个 stale CplD**；reset 后再发新的 H2C/C2H，两边都正常完成，DUT busy 也恢复为 0。这样同时验证了旧事务不会跨 reset 泄漏，以及 reset 后资源能重新初始化并继续前进。
+
+
+## 43. Split Completion 和 Multi-beat Completion 有什么区别？
+
+Split Completion 是**一个 MemRd 对应多个独立的 CplD 包**，每个包都有自己的 Byte Count、Lower Address 和 Completion header；Multi-beat Completion 是**一个 CplD 包本身因为 payload 较大，在 256-bit 接口上跨多个 beat 传输**。P27 里我把单个 CplD 配成 64 B，所以会跨 2 个 256-bit beat，SOP 只在第一拍、EOP 只在最后一拍；中间如果 `ready` 拉低，当前 beat 必须保持稳定，而且 Scoreboard 只在最后一拍真正握手后消费一次完整 CplD。Run #133 实测生成 **64 个 multi-beat CplD，最大 2 beats，出现 13 个 Completion stall cycles**，最终 4 KiB H2C 数据完整正确。
+
+## 44. Read/Write Enable 门控是怎么验证的？
+
+我不是只在空闲时切一下 enable，而是让真实 Descriptor 保持 valid，再把对应的 `read_enable` 或 `write_enable` 拉低。禁用期间要求 Descriptor 不能握手，也不能偷偷发出 MemRd/MemWr；恢复 enable 后，同一个 pending Descriptor 必须继续握手并完成端到端数据检查。Run #133 的 directed test 两个方向都通过，并输出 `[ENABLE] read/write enable gating held descriptors while disabled and recovered cleanly`。
