@@ -2,7 +2,7 @@ class dma_multibeat_cpl_seq extends dma_base_seq;
   `uvm_object_utils(dma_multibeat_cpl_seq)
   function new(string name="dma_multibeat_cpl_seq"); super.new(name); endfunction
   task body();
-    send(DMA_H2C,64'h0000_0005_0000_4000,20'h34000,1024,8'hf0);
+    send(DMA_H2C,64'h0000_0005_0000_4000,20'h34000,4096,8'hf0);
   endtask
 endclass
 
@@ -25,7 +25,7 @@ class dma_multibeat_cpl_test extends dma_base_test;
     env.host.rsp.cfg.enable_cross_tag_ooo=0;
     env.ram.model.wr_stall_pct=100;
 
-    env.mem.seed_host(64'h0000_0005_0000_4000,1024);
+    env.mem.seed_host(64'h0000_0005_0000_4000,4096);
     seq=dma_multibeat_cpl_seq::type_id::create("seq");
     seq.start(env.desc.sqr);
 
@@ -55,7 +55,7 @@ class dma_multibeat_cpl_test extends dma_base_test;
       `uvm_error("MB_CPL",$sformatf("expected at least two beats in one CplD, observed max=%0d",
         env.host.rsp.max_cpl_beats))
     if(env.sb.split_read_requests==0)
-      `uvm_error("MB_CPL","expected the 1024-byte H2C transfer to include split Completion requests")
+      `uvm_error("MB_CPL","expected the 4096-byte H2C transfer to include split Completion requests")
 
     if(env.sb.checks==1 && env.host.rsp.max_cpl_beats>=2 &&
        env.host.rsp.multi_beat_cpl_stall_cycles>=4)
