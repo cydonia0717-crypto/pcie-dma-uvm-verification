@@ -52,4 +52,5 @@ package dma_uvm_pkg;
   `include "tests/dma_zero_len_test.sv"
   `include "tests/dma_reset_recovery_test.sv"
   `include "tests/dma_enable_gating_test.sv"
+  `include "tests/dma_multibeat_cpl_test.sv"
 endpackage
