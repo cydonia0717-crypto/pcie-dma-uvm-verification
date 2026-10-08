@@ -5,28 +5,28 @@ This file records the last fully qualified public baseline used by the resume nu
 ## Baseline
 
 - GitHub Actions workflow: `oss-smoke`
-- run: **#110**
-- head: `3a33ec3fbd2050a09fecebb7c22392101c91eb66`
+- run: **#133**
+- head: `a5f01ad61eeaa37a72466d70068f87271735fefc`
 - conclusion: **success**
-- artifact: `pcie-dma-regression-110`
+- artifact: `pcie-dma-regression-133`
 
 The qualification archived each UVM run log, each Verilator coverage database, the merged coverage database, machine-readable regression summary, and the pristine-upstream bug reproducer.
 
 ## Normal-regression totals
 
-- clean simulation runs: **15**
-- completed descriptor end-to-end checks: **260**
-- Memory Read TLPs: **2,708**
-- Memory Write TLPs: **1,112**
-- Completion-with-Data packets: **41,399**
-- read requests completed through multiple CplD packets: **2,675**
+- clean simulation runs: **17**
+- completed descriptor end-to-end checks: **263**
+- Memory Read TLPs: **2,726**
+- Memory Write TLPs: **1,116**
+- Completion-with-Data packets: **41,479**
+- read requests completed through multiple CplD packets: **2,693**
 - peak simultaneous PCIe Memory Read tags: **16**
 - peak simultaneous DMA descriptors: **11**
 - distinct PCIe tags exercised: **16**
 - legal PCIe tag reuse events after retirement: **2,568**
 - largest observed MemRd: **512 B**
 - largest observed MemWr: **256 B**
-- H2C Device-RAM bytes written: **1,322,271 B**
+- H2C Device-RAM bytes written: **1,326,879 B**
 - UVM errors/fatals: **0 / 0 in every normal run**
 
 ## Directed proof points
@@ -73,6 +73,26 @@ The scoreboard remains clean while one request is split into multiple CplD packe
 
 PCIe request ready and segmented-RAM command/response paths are independently throttled.  The run reaches 16 active PCIe read tags while completing both transfer directions without data loss or protocol-stability errors.
 
+### Read/write enable gating
+
+The directed enable-gating run holds a real H2C or C2H descriptor valid while the corresponding DUT enable is low.  No descriptor handshake or downstream Memory Request is allowed to escape while disabled; after re-enable the same descriptor must complete end-to-end.  Run #133 reports:
+
+```text
+[ENABLE] read/write enable gating held descriptors while disabled and recovered cleanly
+```
+
+### Multi-beat Completion TLP
+
+This is distinct from Split Completion.  Split Completion means one MemRd is completed by multiple semantic CplD packets; the multi-beat case means one semantic CplD packet itself spans multiple 256-bit interface beats.  The host responder preserves SOP/EOP packet boundaries, does not interleave beats from different packets, holds the active beat stable under `valid && !ready`, and publishes the semantic CplD to the scoreboard only after the final EOP handshake.
+
+The 4 KiB directed case uses 64-byte CplD packets over two 256-bit beats and deliberately fills downstream buffering until Completion input backpressure is observed.  Run #133 reports:
+
+```text
+[MB_CPL] multibeat_cpl=64 max_beats=2 stalled_cycles=13 split_reads=16
+```
+
+The descriptor completes with 4,096 destination bytes checked cleanly.  This coverage-directed testcase increased DUT branch coverage from 208/253 to 218/253 while preserving all previous regression results.
+
 ### Completion error propagation
 
 An Unsupported Request Completion is injected and is required to propagate to descriptor status as DMA error **0xA**.
@@ -89,7 +109,7 @@ This same test originally exposed the read-size arithmetic overflow documented i
 
 ### Mid-flight reset recovery
 
-The reset-directed run first allows a real H2C descriptor to create live PCIe read state while Completion traffic is held.  Runtime reset then flushes verification-side stale contexts and the DUT is required to clear busy/resource state before accepting fresh traffic.  Run #110 reports:
+The reset-directed run first allows a real H2C descriptor to create live PCIe read state while Completion traffic is held.  Runtime reset then flushes verification-side stale contexts and the DUT is required to clear busy/resource state before accepting fresh traffic.  Run #133 reports:
 
 ```text
 [RESET] mid-flight reset flushed 1 descriptors/2 PCIe reads, dropped 16 stale CplD, and post-reset H2C/C2H completed cleanly
@@ -113,10 +133,10 @@ Both H2C and C2H zero-length descriptors are checked.  The qualification require
 
 Merged public qualification:
 
-- reachable functional coverage: **51/51 = 100%**
-- raw covergroup: **51/53 = 96.2%**
-- DUT-scoped line coverage: **818/840 = 97.4%**
-- DUT-scoped branch coverage: **208/253 = 82.2%**
+- reachable functional coverage: **53/53 = 100%**
+- raw covergroup: **53/55 = 96.4%**
+- DUT-scoped line coverage: **820/840 = 97.6%**
+- DUT-scoped branch coverage: **218/253 = 86.2%**
 
 The two raw covergroup bins excluded from the reachable denominator are semantic exclusions: an illegal single request crossing a 4 KiB boundary and an ignored Completion-status catch-all.
 
